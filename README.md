@@ -1,5 +1,5 @@
 
-# OpenSub Bitext Retrieval Fork
+# MINERS Fork
 
 This fork was developed for Ontario Tech University's CSCI 6720 course project, focusing on bug fixes and improvements related to the OpenSub bitext Retrieval Dataset.
 
@@ -21,14 +21,14 @@ conda activate miners
 
 ## 📝 Experiment Logs
 
-Experiment logs can be found in the Jupyter notebook provided [here](./logs.ipynb).
+Experiment logs (baseline and more) can be found in the Jupyter notebook provided [here](./logs.ipynb).
 
 ## 🚀 Running Experiments
 
 ### Bitext Retrieval
 
 The main focus of this project is the bitext retrieval task using the OpenSub dataset.<br> 
-You can run experiments by following the instructions in the provided notebooks and scripts.
+You can run experiments by following the commands in the Experiment logs notebook or the following command:
 ```
 ❱❱❱ python bitext.py --src_lang af --dataset opensub --seed 42 --cuda --model_checkpoint sentence-transformers/LaBSE
 ```
