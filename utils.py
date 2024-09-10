@@ -131,7 +131,7 @@ class NollySentiDataset():
             self.valid_data[key] = {"source":[], "target":[], "target_text":[]}
             self.test_data[key] = {"source":[], "target":[], "target_text":[]}
 
-            with open(train_url) as file:
+            with open(train_url, encoding="utf-8") as file:
                 tsv_file = csv.reader(file, delimiter="\t")
                 count = 0
                 for arr in tsv_file:
@@ -143,7 +143,7 @@ class NollySentiDataset():
                     self.train_data[key]["target"].append(int(self.LABELS_TO_IDS[label]))
                     self.train_data[key]["target_text"].append(label)
 
-            with open(dev_url) as file:
+            with open(dev_url, encoding="utf-8") as file:
                 tsv_file = csv.reader(file, delimiter="\t")
                 count = 0
                 for arr in tsv_file:
@@ -155,7 +155,7 @@ class NollySentiDataset():
                     self.valid_data[key]["target"].append(int(self.LABELS_TO_IDS[label]))
                     self.valid_data[key]["target_text"].append(label)
 
-            with open(test_url) as file:
+            with open(test_url, encoding="utf-8") as file:
                 tsv_file = csv.reader(file, delimiter="\t")
                 count = 0
                 for arr in tsv_file:
@@ -188,7 +188,7 @@ class NollySentiDataset():
             self.valid_data[key] = {"source":[], "target":[]}
             self.test_data[key] = {"source":[], "target":[]}
 
-            with open(train_url) as file:
+            with open(train_url, encoding="utf-8") as file:
                 tsv_file = csv.reader(file, delimiter="\t")
                 count = 0
                 for arr in tsv_file:
@@ -199,7 +199,7 @@ class NollySentiDataset():
                     self.train_data[key]["target"].append(self.prompt + text)
                     self.all_data[key]["target"].append(self.prompt + text)
 
-            with open(dev_url) as file:
+            with open(dev_url, encoding="utf-8") as file:
                 tsv_file = csv.reader(file, delimiter="\t")
                 count = 0
                 for arr in tsv_file:
@@ -210,7 +210,7 @@ class NollySentiDataset():
                     self.valid_data[key]["target"].append(self.prompt + text)
                     self.all_data[key]["target"].append(self.prompt + text)
 
-            with open(test_url) as file:
+            with open(test_url, encoding="utf-8") as file:
                 tsv_file = csv.reader(file, delimiter="\t")
                 count = 0
                 for arr in tsv_file:
@@ -225,7 +225,7 @@ class NollySentiDataset():
             dev_url = f"datasets/nollysenti/{self.src_lang}/dev.tsv"
             test_url = f"datasets/nollysenti/{self.src_lang}/test.tsv"
 
-            with open(train_url) as file:
+            with open(train_url, encoding="utf-8") as file:
                 tsv_file = csv.reader(file, delimiter="\t")
                 count = 0
                 for arr in tsv_file:
@@ -236,7 +236,7 @@ class NollySentiDataset():
                     self.train_data[key]["source"].append(self.prompt + text)
                     self.all_data[key]["source"].append(self.prompt + text)
 
-            with open(dev_url) as file:
+            with open(dev_url, encoding="utf-8") as file:
                 tsv_file = csv.reader(file, delimiter="\t")
                 count = 0
                 for arr in tsv_file:
@@ -247,7 +247,7 @@ class NollySentiDataset():
                     self.valid_data[key]["source"].append(self.prompt + text)
                     self.all_data[key]["source"].append(self.prompt + text)
 
-            with open(test_url) as file:
+            with open(test_url, encoding="utf-8") as file:
                 tsv_file = csv.reader(file, delimiter="\t")
                 count = 0
                 for arr in tsv_file:
