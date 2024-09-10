@@ -133,6 +133,8 @@ if __name__ == "__main__":
         dataset = PhincDataset(prompt=args.prompt, src_lang=args.src_lang)
     if args.dataset == "nollysenti":
         dataset = NollySentiDataset(prompt=args.prompt, src_lang=args.src_lang)
+    if args.dataset == "opensub":
+        dataset = OpenSubtitlesDataset(prompt=args.prompt, src_lang=args.src_lang)
 
     for target_lang in dataset.LANGS:
         # get embeddings

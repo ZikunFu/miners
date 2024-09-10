@@ -383,6 +383,46 @@ class BUCCDataset():
             self.test_data[key]["target"].append(self.prompt + dataset["test"][i]["sentence2"])
             self.all_data[key]["target"].append(self.prompt + dataset["test"][i]["sentence2"])
         self.train_data = self.all_data
+        
+class OpenSubtitlesDataset():
+    def __init__(self, prompt="", src_lang="af"):
+        self.all_data = {}
+        self.train_data = {}
+        self.test_data = {}
+        self.prompt = prompt
+
+        self.LANGS = []
+        self.TARGET_LANGS = ["en"]
+
+        # Add source language
+        self.LANGS.append("en")
+
+        # Load the dataset
+        dataset = datasets.load_dataset("loicmagne/open-subtitles-bitext-mining", "af-en")
+        
+        tgt_lang="en"
+        # Prepare keys and structure for language pairs
+        key = src_lang + "_" + tgt_lang
+
+        # Initialize the dictionary for storing source and target sentences
+        if key not in self.train_data:
+            self.train_data[key] = {"source": [], "target": []}
+            self.all_data[key] = {"source": [], "target": []}
+
+        # Loop through the dataset
+        for i in range(len(dataset["train"])):
+            sentence1 = self.prompt + dataset["train"][i]["sentence1"]
+            sentence2 = self.prompt + dataset["train"][i]["sentence2"]
+
+            # Add sentence1 and sentence2 to lists
+            self.train_data[key]["source"].append(sentence1)
+            self.all_data[key]["source"].append(sentence1)
+
+            self.train_data[key]["target"].append(sentence2)
+            self.all_data[key]["target"].append(sentence2)
+
+        # Set the train data to all_data, as test data is not available in this dataset
+        self.train_data = self.all_data
 
 class MassiveIntentDataset():
     def __init__(self, prompt="", src_lang=""):
