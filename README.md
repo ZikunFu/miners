@@ -6,7 +6,7 @@ This fork was developed for Ontario Tech University's CSCI 6720 course project, 
 **Roleplaying Seminar 1**  
 Implementer: Zikun Fu<br>
 
-A presentation on this project can be found here: [Link](https://docs.google.com/presentation/d/15_714D-FxXXxpVXP4rQg-a9k0smK_srcMI1aEZalz9Q/edit?usp=sharing)
+A presentation on this project can be found here: [Link](https://docs.google.com/presentation/d/1U9qeot-BlmUkxxnJ2N1VWj7X7QgrHDynH_J-1ECgf_U/edit?usp=sharing)
 
 ## 🔧 Environment Setup
 
