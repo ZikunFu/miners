@@ -169,95 +169,46 @@ class NollySentiDataset():
 
     def create_bitext(self):
         self.LANGS = ['en400', 'ha', 'ig', 'pcm', 'yo400']
-        self.TARGET_LANGS = []
+        self.TARGET_LANGS = [lang for lang in self.LANGS if lang != self.src_lang]
+        for tgt_lang in self.TARGET_LANGS:
+            key = f"{self.src_lang}_{tgt_lang}"
+            #print(f"Processing language pair: {key}")
+            self.all_data[key] = {"source": [], "target": []}
+            self.train_data[key] = {"source": [], "target": []}
+            self.valid_data[key] = {"source": [], "target": []}
+            self.test_data[key] = {"source": [], "target": []}
+            # Paths to source and target language files
+            src_train_url = f"datasets/nollysenti/{self.src_lang}/train.tsv"
+            tgt_train_url = f"datasets/nollysenti/{tgt_lang}/train.tsv"
+            src_dev_url = f"datasets/nollysenti/{self.src_lang}/dev.tsv"
+            tgt_dev_url = f"datasets/nollysenti/{tgt_lang}/dev.tsv"
+            src_test_url = f"datasets/nollysenti/{self.src_lang}/test.tsv"
+            tgt_test_url = f"datasets/nollysenti/{tgt_lang}/test.tsv"
+            # Load training data
+            self.load_parallel_data(src_train_url, tgt_train_url, self.train_data[key], self.all_data[key])
+            # Load validation data
+            self.load_parallel_data(src_dev_url, tgt_dev_url, self.valid_data[key], self.all_data[key])
+            # Load test data
+            self.load_parallel_data(src_test_url, tgt_test_url, self.test_data[key], self.all_data[key])
 
-        for lang in self.LANGS:
-            if lang != self.src_lang:
-                self.TARGET_LANGS.append(lang)
+    def load_parallel_data(self, src_url, tgt_url, data_dict, all_data_dict):
+        with open(src_url, encoding="utf-8") as src_file, open(tgt_url, encoding="utf-8") as tgt_file:
+            src_reader = csv.reader(src_file, delimiter="\t")
+            tgt_reader = csv.reader(tgt_file, delimiter="\t")
 
-        for lang in self.TARGET_LANGS:
-            key = lang
-            print(key)
-            train_url = f"datasets/nollysenti/{lang}/train.tsv"
-            dev_url = f"datasets/nollysenti/{lang}/dev.tsv"
-            test_url = f"datasets/nollysenti/{lang}/test.tsv"
-        
-            key = self.src_lang + "_" + lang
-            self.all_data[key] = {"source":[], "target":[]}
-            self.train_data[key] = {"source":[], "target":[]}
-            self.valid_data[key] = {"source":[], "target":[]}
-            self.test_data[key] = {"source":[], "target":[]}
+            # Skip headers
+            next(src_reader)
+            next(tgt_reader)
 
-            with open(train_url, encoding="utf-8") as file:
-                tsv_file = csv.reader(file, delimiter="\t")
-                count = 0
-                for arr in tsv_file:
-                    count += 1
-                    if count == 1:
-                        continue
-                    text, label = arr
-                    self.train_data[key]["target"].append(self.prompt + text)
-                    self.all_data[key]["target"].append(self.prompt + text)
+            for src_row, tgt_row in zip(src_reader, tgt_reader):
+                src_text, _ = src_row
+                tgt_text, _ = tgt_row
+                data_dict["source"].append(src_text)
+                data_dict["target"].append(tgt_text)
+                all_data_dict["source"].append(src_text)
+                all_data_dict["target"].append(tgt_text)
 
-            with open(dev_url, encoding="utf-8") as file:
-                tsv_file = csv.reader(file, delimiter="\t")
-                count = 0
-                for arr in tsv_file:
-                    count += 1
-                    if count == 1:
-                        continue
-                    text, label = arr
-                    self.valid_data[key]["target"].append(self.prompt + text)
-                    self.all_data[key]["target"].append(self.prompt + text)
-
-            with open(test_url, encoding="utf-8") as file:
-                tsv_file = csv.reader(file, delimiter="\t")
-                count = 0
-                for arr in tsv_file:
-                    count += 1
-                    if count == 1:
-                        continue
-                    text, label = arr
-                    self.test_data[key]["target"].append(self.prompt + text)
-                    self.all_data[key]["target"].append(self.prompt + text)
-
-            train_url = f"datasets/nollysenti/{self.src_lang}/train.tsv"
-            dev_url = f"datasets/nollysenti/{self.src_lang}/dev.tsv"
-            test_url = f"datasets/nollysenti/{self.src_lang}/test.tsv"
-
-            with open(train_url, encoding="utf-8") as file:
-                tsv_file = csv.reader(file, delimiter="\t")
-                count = 0
-                for arr in tsv_file:
-                    count += 1
-                    if count == 1:
-                        continue
-                    text, label = arr
-                    self.train_data[key]["source"].append(self.prompt + text)
-                    self.all_data[key]["source"].append(self.prompt + text)
-
-            with open(dev_url, encoding="utf-8") as file:
-                tsv_file = csv.reader(file, delimiter="\t")
-                count = 0
-                for arr in tsv_file:
-                    count += 1
-                    if count == 1:
-                        continue
-                    text, label = arr
-                    self.valid_data[key]["source"].append(self.prompt + text)
-                    self.all_data[key]["source"].append(self.prompt + text)
-
-            with open(test_url, encoding="utf-8") as file:
-                tsv_file = csv.reader(file, delimiter="\t")
-                count = 0
-                for arr in tsv_file:
-                    count += 1
-                    if count == 1:
-                        continue
-                    text, label = arr
-                    self.test_data[key]["source"].append(self.prompt + text)
-                    self.all_data[key]["source"].append(self.prompt + text)
-
+            
 class NusaTranslationDataset():
     def __init__(self, prompt="", src_lang="ind"):
         self.all_data = {}
