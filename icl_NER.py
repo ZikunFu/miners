@@ -16,7 +16,7 @@ from seqeval.metrics import classification_report, f1_score
 
 OPENAI_TOKEN = ""
 COHERE_TOKEN = ""
-HF_TOKEN = "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"
+HF_TOKEN = ""
 
 def argmax(array):
     """argmax with deterministic pseudorandom tie breaking."""
@@ -39,12 +39,14 @@ def set_seed(seed):
     torch.cuda.manual_seed(seed)
     
 def get_llama3_instruct_chat_response(gen_model, tokenizer, gen_model_checkpoint, messages, seed):
+    print("messages: ", messages)
     input_ids = tokenizer.apply_chat_template(
         messages,
         add_generation_prompt=True,
         return_tensors="pt"
     ).to(gen_model.device)
-
+    
+    
     terminators = [
         tokenizer.eos_token_id,
         tokenizer.convert_tokens_to_ids("<|eot_id|>")
@@ -52,7 +54,8 @@ def get_llama3_instruct_chat_response(gen_model, tokenizer, gen_model_checkpoint
 
     outputs = gen_model.generate(
         input_ids,
-        max_new_tokens=256,  # Increased to handle longer outputs for NER tags
+        pad_token_id=tokenizer.eos_token,
+        max_new_tokens=64,  
         eos_token_id=terminators,
         do_sample=True,
         temperature=0.2,
@@ -60,7 +63,8 @@ def get_llama3_instruct_chat_response(gen_model, tokenizer, gen_model_checkpoint
     )
 
     response = outputs[0][input_ids.shape[-1]:]
-    return tokenizer.decode(response, skip_special_tokens=True)
+    print("response: ", tokenizer.decode(response, skip_special_tokens=True, clean_up_tokenization_spaces=True))
+    return tokenizer.decode(response, skip_special_tokens=True, clean_up_tokenization_spaces=True)
 
 def retrieve_ids(train_embeddings, test_embeddings, train_labels, k, balance=False, all_possible_labels=[]):
     all_samples = []
@@ -122,7 +126,7 @@ def construct_prompt(few_shot_examples, test_tokens):
         # User provides a sentence
         user_message = {
             "role": "user",
-            "content": "Please provide NER tags for the following sentence:\n" + " ".join(tokens)
+            "content": "Study this taxonomy for classifying named entities:- LOC (Location or physical facilities)- ORG (Organizations, corporations or other entities)- PER (Names of people)- DATE (Date or time)Identify all named entities in the following tokens:{" + " ".join(tokens)+"}\nAdditionally, you should add B- to the first token of a given entity and I- to subsequent ones if they exist. For tokens that are not named entities, mark them as O."
         }
         messages.append(user_message)
         # Assistant provides the tags
@@ -135,7 +139,7 @@ def construct_prompt(few_shot_examples, test_tokens):
     # Add the test sentence
     user_message = {
         "role": "user",
-        "content": "Please provide NER tags for the following sentence:\n" + " ".join(test_tokens)
+        "content": "Study this taxonomy for classifying named entities:- LOC (Location or physical facilities)- ORG (Organizations, corporations or other entities)- PER (Names of people)- DATE (Date or time)Identify all named entities in the following tokens:{" + " ".join(tokens)+"}\nAdditionally, you should add B- to the first token of a given entity and I- to subsequent ones if they exist. For tokens that are not named entities, mark them as O."
     }
     messages.append(user_message)
     return messages
@@ -196,7 +200,8 @@ if __name__ == "__main__":
         )
         tokenizer = AutoTokenizer.from_pretrained(
             args.gen_model_checkpoint,
-            token=HF_TOKEN
+            token=HF_TOKEN,
+            clean_up_tokenization_spaces=True
         )
     else:
         gen_model = AutoModelForCausalLM.from_pretrained(
@@ -206,12 +211,13 @@ if __name__ == "__main__":
         )
         tokenizer = AutoTokenizer.from_pretrained(
             args.gen_model_checkpoint,
-            token=HF_TOKEN
+            token=HF_TOKEN,
+            clean_up_tokenization_spaces=True
         )
 
     # Load MasakhaNERDataset
     if args.dataset == "masakhaner":
-        dataset = MasakhaNERDataset(prompt=args.prompt)
+        dataset = MasakhaNERDataset(prompt=args.prompt, sample_size=10)
 
     for lang in dataset.LANGS:
         print(f"Processing language: {lang}")
