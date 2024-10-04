@@ -1,15 +1,52 @@
 name: miners
 channels:
+  - conda-forge
   - defaults
 dependencies:
-  - ca-certificates=2024.7.2=haa95532_0
-  - openssl=3.0.15=h827c3e9_0
+  - asttokens=2.4.1=pyhd8ed1ab_0
+  - ca-certificates=2024.8.30=h56e8100_0
+  - colorama=0.4.6=pyhd8ed1ab_0
+  - comm=0.2.2=pyhd8ed1ab_0
+  - debugpy=1.8.6=py39ha51f57c_0
+  - decorator=5.1.1=pyhd8ed1ab_0
+  - exceptiongroup=1.2.2=pyhd8ed1ab_0
+  - executing=2.1.0=pyhd8ed1ab_0
+  - importlib-metadata=8.5.0=pyha770c72_0
+  - ipykernel=6.29.5=pyh4bbf305_0
+  - ipython=8.18.1=pyh7428d3b_3
+  - jedi=0.19.1=pyhd8ed1ab_0
+  - jupyter_client=8.6.3=pyhd8ed1ab_0
+  - jupyter_core=5.7.2=py39hcbf5309_0
+  - krb5=1.21.3=hdf4eb48_0
+  - libsodium=1.0.20=hc70643c_0
+  - matplotlib-inline=0.1.7=pyhd8ed1ab_0
+  - nest-asyncio=1.6.0=pyhd8ed1ab_0
+  - openssl=3.3.2=h2466b09_0
+  - packaging=24.1=pyhd8ed1ab_0
+  - parso=0.8.4=pyhd8ed1ab_0
+  - pickleshare=0.7.5=py_1003
+  - prompt-toolkit=3.0.48=pyha770c72_0
+  - psutil=6.0.0=py39ha55e580_1
+  - pure_eval=0.2.3=pyhd8ed1ab_0
+  - pygments=2.18.0=pyhd8ed1ab_0
   - python=3.9.19=h1aa4202_1
+  - python_abi=3.9=2_cp39
+  - pyzmq=26.2.0=py39h03e5c00_2
   - setuptools=72.1.0=py39haa95532_0
+  - six=1.16.0=pyh6c4a22f_0
   - sqlite=3.45.3=h2bbff1b_0
+  - stack_data=0.6.2=pyhd8ed1ab_0
+  - tornado=6.4.1=py39ha55e580_1
+  - traitlets=5.14.3=pyhd8ed1ab_0
+  - typing_extensions=4.12.2=pyha770c72_0
+  - ucrt=10.0.22621.0=h57928b3_0
   - vc=14.40=h2eaa2aa_0
-  - vs2015_runtime=14.40.33807=h98bb1dd_0
+  - vc14_runtime=14.40.33810=ha82c5b3_21
+  - vs2015_runtime=14.40.33810=h3bf8584_21
+  - wcwidth=0.2.13=pyhd8ed1ab_0
   - wheel=0.43.0=py39haa95532_0
+  - zeromq=4.3.5=he1f189c_5
+  - zipp=3.20.2=pyhd8ed1ab_0
   - pip:
       - accelerate==0.34.2
       - aiohappyeyeballs==2.4.0
@@ -34,17 +71,14 @@ dependencies:
       - charset-normalizer==3.3.2
       - click==8.1.7
       - cohere==5.9.1
-      - colorama==0.4.6
       - conllu==5.0.1
       - cython==3.0.11
       - datasets==2.19.1
-      - decorator==5.1.1
       - dill==0.3.8
       - distlib==0.3.8
       - distro==1.9.0
       - docopt==0.6.2
       - et-xmlfile==1.1.0
-      - exceptiongroup==1.2.2
       - fairseq==0.12.2
       - fastavro==1.9.7
       - ffmpeg==1.4
@@ -91,7 +125,6 @@ dependencies:
       - omegaconf==2.0.6
       - openai==1.44.0
       - openpyxl==3.1.5
-      - packaging==24.1
       - pandas==2.2.2
       - parameterized==0.9.0
       - pathspec==0.12.1
@@ -102,7 +135,6 @@ dependencies:
       - portalocker==2.10.1
       - pre-commit==3.8.0
       - protobuf==5.28.0
-      - psutil==6.0.0
       - pyarrow==17.0.0
       - pyarrow-hotfix==0.6
       - pycodestyle==2.12.1
@@ -124,7 +156,7 @@ dependencies:
       - scipy==1.13.1
       - sentence-transformers==3.0.1
       - sentencepiece==0.2.0
-      - six==1.16.0
+      - seqeval==1.2.2
       - sniffio==1.3.1
       - sortedcontainers==2.4.0
       - soundfile==0.12.1
@@ -139,16 +171,14 @@ dependencies:
       - torchaudio==2.4.1+cu121
       - torchvision==0.19.1+cu121
       - tqdm==4.66.5
-      - transformers==4.40.2
+      - transformers==4.44.2
       - translate-toolkit==3.13.3
       - types-requests==2.31.0.6
       - types-urllib3==1.26.25.14
-      - typing-extensions==4.12.2
       - tzdata==2024.1
       - unicategories==0.1.2
       - urllib3==1.26.20
       - virtualenv==20.26.4
-      - wcwidth==0.2.13
       - win32-setctime==1.1.0
       - xxhash==3.5.0
       - yarl==1.11.0
