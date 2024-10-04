@@ -8,15 +8,15 @@ import hashlib
 from tqdm import tqdm
 from collections import Counter
 from sentence_transformers import SentenceTransformer
-from utils import MasakhaNERDataset 
+from utils import MasakhaNERDataset
 import transformers
-from transformers import LlamaForCausalLM, AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from seqeval.metrics import classification_report, f1_score
 
 
 OPENAI_TOKEN = ""
 COHERE_TOKEN = ""
-HF_TOKEN = "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"
+HF_TOKEN = "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"
 
 def argmax(array):
     """argmax with deterministic pseudorandom tie breaking."""
@@ -38,15 +38,27 @@ def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     
-def get_llama3_instruct_chat_response(gen_model, tokenizer, gen_model_checkpoint, text, seed):
-    input_ids = tokenizer.encode(text, return_tensors="pt").to(gen_model.device)
+def get_llama3_instruct_chat_response(gen_model, tokenizer, gen_model_checkpoint, messages, seed):
+    input_ids = tokenizer.apply_chat_template(
+        messages,
+        add_generation_prompt=True,
+        return_tensors="pt"
+    ).to(gen_model.device)
+
+    terminators = [
+        tokenizer.eos_token_id,
+        tokenizer.convert_tokens_to_ids("<|eot_id|>")
+    ]
+
     outputs = gen_model.generate(
         input_ids,
         max_new_tokens=256,  # Increased to handle longer outputs for NER tags
+        eos_token_id=terminators,
         do_sample=True,
         temperature=0.2,
         top_p=1
     )
+
     response = outputs[0][input_ids.shape[-1]:]
     return tokenizer.decode(response, skip_special_tokens=True)
 
@@ -68,10 +80,8 @@ def retrieve_ids(train_embeddings, test_embeddings, train_labels, k, balance=Fal
             
             test_embedding = torch.FloatTensor(test_embeddings[test_id]).unsqueeze(0)
             test_embedding = test_embedding.expand(len(train_embedding), -1).unsqueeze(1).cuda()
-
-            # print(train_embedding.size(), test_embedding.size())
             
-            dist = torch.cdist(test_embedding, train_embedding , p=2, compute_mode='use_mm_for_euclid_dist_if_necessary').squeeze().tolist()
+            dist = torch.cdist(test_embedding, train_embedding, p=2, compute_mode='use_mm_for_euclid_dist_if_necessary').squeeze().tolist()
 
             if isinstance(dist, float):
                 dist = [dist]
@@ -80,18 +90,15 @@ def retrieve_ids(train_embeddings, test_embeddings, train_labels, k, balance=Fal
                 dists.append([dist[j], train_labels[i*batch_size + j], i*batch_size + j])
 
         if balance:
-            sorted_dists = sorted(dists,key=lambda l:l[0], reverse=False)
+            sorted_dists = sorted(dists, key=lambda l: l[0], reverse=False)
         else:
-            sorted_dists = sorted(dists,key=lambda l:l[0], reverse=False)[:k]
+            sorted_dists = sorted(dists, key=lambda l: l[0], reverse=False)[:k]
 
         all_indices = []
         if balance:
-            # print(all_possible_labels)
             for opt in all_possible_labels:
                 count_found = 0
-                # print(">", opt)
                 for obj in sorted_dists:
-                    # print(">>", opt, obj[1])
                     if opt == obj[1]:
                         all_indices.append(obj[2])
                         count_found += 1
@@ -99,21 +106,39 @@ def retrieve_ids(train_embeddings, test_embeddings, train_labels, k, balance=Fal
                             break
         else:
             all_indices = [obj[2] for obj in sorted_dists]
-        # print(">", len(all_indices))
         all_samples.append(all_indices)
     return all_samples
 
 def construct_prompt(few_shot_examples, test_tokens):
-    prompt = "Generate named entity recognition labels on the following sentences.\nPlease only output the labels\n\n"
+    messages = []
+    system_message = {
+        "role": "system",
+        "content": "You are a helpful assistant that performs named entity recognition (NER)."
+    }
+    messages.append(system_message)
     
+    # Add few-shot examples as assistant and user turns
     for tokens, ner_tags in few_shot_examples:
-        prompt += "Sentence: " + " ".join(tokens) + "\n"
-        prompt += "Options: " + " ".join(dataset.LABELS) + "\n"
-        prompt += "Labels: " + " ".join(dataset.convert_ner_tags(ner_tags, to_labels=True)) + "\n\n"
-    prompt += "Sentence: " + " ".join(test_tokens) + "\n"
-    prompt += "Options: " + " ".join(dataset.LABELS) + "\n"
-    prompt += "Labels:"
-    return prompt
+        # User provides a sentence
+        user_message = {
+            "role": "user",
+            "content": "Please provide NER tags for the following sentence:\n" + " ".join(tokens)
+        }
+        messages.append(user_message)
+        # Assistant provides the tags
+        assistant_message = {
+            "role": "assistant",
+            "content": " ".join(dataset.convert_ner_tags(ner_tags, to_labels=True))
+        }
+        messages.append(assistant_message)
+    
+    # Add the test sentence
+    user_message = {
+        "role": "user",
+        "content": "Please provide NER tags for the following sentence:\n" + " ".join(test_tokens)
+    }
+    messages.append(user_message)
+    return messages
 
 def process_model_output(output, num_tokens):
     pred_labels = output.strip().split()
@@ -137,7 +162,7 @@ if __name__ == "__main__":
         "--gen_model_checkpoint",
         default="meta-llama/Meta-Llama-3.1-8B-Instruct",
         type=str,
-        help="Path to pre-trained generation model (Llama3.1)")
+        help="Path to pre-trained generation model (Llama 3.1)")
     parser.add_argument("--dataset", type=str, default="masakhaner", help="Dataset name")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for initialization")
     parser.add_argument("--cuda", action="store_true", help="Use CUDA when available")
@@ -161,14 +186,28 @@ if __name__ == "__main__":
     embedding_model = SentenceTransformer(args.model_checkpoint).cuda()
     batch_size = 128
 
-    # Load generation model (Llama3.1)
+    # Load generation model (Llama 3.1)
     if args.load_in_8bit:
-        gen_model = AutoModelForCausalLM.from_pretrained(args.gen_model_checkpoint, token=HF_TOKEN, device_map="auto", load_in_8bit=True)
-        tokenizer = AutoTokenizer.from_pretrained(args.gen_model_checkpoint, token=HF_TOKEN, device_map="auto", load_in_8bit=True)
+        gen_model = AutoModelForCausalLM.from_pretrained(
+            args.gen_model_checkpoint,
+            token=HF_TOKEN,
+            device_map="auto",
+            load_in_8bit=True
+        )
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.gen_model_checkpoint,
+            token=HF_TOKEN
+        )
     else:
-        gen_model = AutoModelForCausalLM.from_pretrained(args.gen_model_checkpoint, token=HF_TOKEN, device_map="auto", load_in_8bit=False)
-        tokenizer = AutoTokenizer.from_pretrained(args.gen_model_checkpoint, token=HF_TOKEN, device_map="auto", load_in_8bit=True)
-
+        gen_model = AutoModelForCausalLM.from_pretrained(
+            args.gen_model_checkpoint,
+            token=HF_TOKEN,
+            device_map="auto"
+        )
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.gen_model_checkpoint,
+            token=HF_TOKEN
+        )
 
     # Load MasakhaNERDataset
     if args.dataset == "masakhaner":
@@ -180,8 +219,6 @@ if __name__ == "__main__":
         # Get train and test data
         train_data = dataset.train_data
         test_data = dataset.test_data
-        #train_data = dataset.train_data[lang]
-        #test_data = dataset.test_data[lang]
 
         train_tokens = [sample['tokens'] for sample in train_data]
         train_tags = [sample['ner_tags'] for sample in train_data]
@@ -218,18 +255,19 @@ if __name__ == "__main__":
                     few_shot_examples.append((tokens, labels))
 
             # Construct prompt
-            prompt = construct_prompt(few_shot_examples, test_tokens_example)
-            prompts.append(prompt)
-
+            messages = construct_prompt(few_shot_examples, test_tokens_example)
+            prompts.append(messages)
+            
             # Get model output
             hyp = get_llama3_instruct_chat_response(
-                gen_model, tokenizer, args.gen_model_checkpoint, prompt, args.seed
+                gen_model, tokenizer, args.gen_model_checkpoint, messages, args.seed
             )
 
             # Process model output
             num_tokens = len(test_tokens_example)
             pred_labels = process_model_output(hyp, num_tokens)
             hyps.append(pred_labels)
+            
 
         # Evaluate using seqeval
         f1 = f1_score(test_tags, hyps)
