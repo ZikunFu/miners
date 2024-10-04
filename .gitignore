@@ -1,6 +1,7 @@
 logs
 logs.zip
 .idea/
+*.code-workspace
 
 # Created by https://www.gitignore.io/api/macos,linux,django,python,pycharm
 

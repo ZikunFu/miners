@@ -755,3 +755,62 @@ class FIREDataset():
                             self.test_data[key]["target_text"].append(label)
                             self.test_data[key]["source"].append(self.prompt + text)
             print(len(self.train_data[key]["source"]), len(self.valid_data[key]["source"]), len(self.test_data[key]["source"]))
+
+#UniversalNER
+#MASSIVE (Slot Filling)
+
+from datasets import load_dataset
+
+class MasakhaNERDataset:
+    def __init__(self, prompt="", src_lang='yor'):
+        self.all_data = {}
+        self.train_data = {}
+        self.valid_data = {}
+        self.test_data = {}
+        self.prompt = prompt
+        self.LANGS = [
+            'bam', 'bbj', 'ewe', 'fon', 'hau', 'ibo', 'kin', 'lug', 'luo', 'mos',
+            'nya', 'pcm', 'sna', 'swa', 'tsn', 'twi', 'wol', 'xho', 'yor', 'zul'
+        ]
+        self.LABELS = ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "B-DATE", "I-DATE"]
+        self.src_lang = src_lang
+        self.load_data()
+        
+    def convert_ner_tags(self, ner_tags, to_labels=True):
+        # Define the mapping from integer tags to string labels
+        tag_to_label = {
+            0: "O",
+            1: "B-PER",
+            2: "I-PER",
+            3: "B-ORG",
+            4: "I-ORG",
+            5: "B-LOC",
+            6: "I-LOC",
+            7: "B-DATE",
+            8: "I-DATE"
+        }
+    
+        # Create the reverse mapping from string labels to integer tags
+        label_to_tag = {label: tag for tag, label in tag_to_label.items()}
+    
+        if to_labels:
+        # Convert integer tags to string labels
+            return [tag_to_label[tag] for tag in ner_tags]
+        else:
+            # Convert string labels to integer tags
+            return [label_to_tag[label] for label in ner_tags]
+
+    def load_data(self):
+        if self.src_lang not in self.LANGS:
+            raise ValueError(f"Language '{self.src_lang}' is not supported.")
+        
+        dataset = load_dataset('masakhane/masakhaner2', self.src_lang)
+        self.train_data = dataset['train']
+        self.valid_data = dataset['validation']
+        self.test_data = dataset['test']
+        self.all_data = dataset
+
+        print(f"Data loaded for language: {self.src_lang}")
+        print(f"Training samples: {len(self.train_data)}")
+        print(f"Validation samples: {len(self.valid_data)}")
+        print(f"Test samples: {len(self.test_data)}")
