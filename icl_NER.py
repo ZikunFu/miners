@@ -9,14 +9,15 @@ from tqdm import tqdm
 from collections import Counter
 from sentence_transformers import SentenceTransformer
 from utils import MasakhaNERDataset
-import transformers
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from seqeval.metrics import classification_report, f1_score
-
+from transformers.utils import logging
+logging.set_verbosity_error() 
+os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 
 OPENAI_TOKEN = ""
 COHERE_TOKEN = ""
-HF_TOKEN = ""
+HF_TOKEN = "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"
 
 def argmax(array):
     """argmax with deterministic pseudorandom tie breaking."""
@@ -37,16 +38,15 @@ def set_seed(seed):
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.benchmark = True
     
-def get_llama3_instruct_chat_response(gen_model, tokenizer, gen_model_checkpoint, messages, seed):
-    print("messages: ", messages)
+def get_llama3_instruct_chat_response(gen_model, tokenizer, gen_model_checkpoint, messages, seed,verbose=True):
     input_ids = tokenizer.apply_chat_template(
         messages,
         add_generation_prompt=True,
         return_tensors="pt"
     ).to(gen_model.device)
-    
-    
+
     terminators = [
         tokenizer.eos_token_id,
         tokenizer.convert_tokens_to_ids("<|eot_id|>")
@@ -54,17 +54,22 @@ def get_llama3_instruct_chat_response(gen_model, tokenizer, gen_model_checkpoint
 
     outputs = gen_model.generate(
         input_ids,
-        pad_token_id=tokenizer.eos_token,
         max_new_tokens=64,  
         eos_token_id=terminators,
         do_sample=True,
         temperature=0.2,
         top_p=1
     )
-
+    inputs = tokenizer.decode(input_ids[0], skip_special_tokens=False)
     response = outputs[0][input_ids.shape[-1]:]
-    print("response: ", tokenizer.decode(response, skip_special_tokens=True, clean_up_tokenization_spaces=True))
-    return tokenizer.decode(response, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+    response = tokenizer.decode(response, skip_special_tokens=True)
+    if(verbose):
+        print("\n"+"="*35+"INPUT"+"="*35)
+        print(inputs)
+        print("="*35+"RESPONSE"+"="*43)
+        print(response)
+        print("="*70)
+    return response
 
 def retrieve_ids(train_embeddings, test_embeddings, train_labels, k, balance=False, all_possible_labels=[]):
     all_samples = []
@@ -80,10 +85,10 @@ def retrieve_ids(train_embeddings, test_embeddings, train_labels, k, balance=Fal
             num_of_batches += 1
 
         for i in range(num_of_batches):
-            train_embedding = torch.FloatTensor(train_embeddings[i*batch_size:(i+1)*batch_size]).unsqueeze(1).cuda()
+            train_embedding = torch.FloatTensor(train_embeddings[i*batch_size:(i+1)*batch_size]).unsqueeze(1)#.cuda()
             
             test_embedding = torch.FloatTensor(test_embeddings[test_id]).unsqueeze(0)
-            test_embedding = test_embedding.expand(len(train_embedding), -1).unsqueeze(1).cuda()
+            test_embedding = test_embedding.expand(len(train_embedding), -1).unsqueeze(1)#.cuda()
             
             dist = torch.cdist(test_embedding, train_embedding, p=2, compute_mode='use_mm_for_euclid_dist_if_necessary').squeeze().tolist()
 
@@ -117,30 +122,49 @@ def construct_prompt(few_shot_examples, test_tokens):
     messages = []
     system_message = {
         "role": "system",
-        "content": "You are a helpful assistant that performs named entity recognition (NER)."
+        "content": "You are a helpful assistant that performs named entity recognition and output only labels."
     }
     messages.append(system_message)
     
-    # Add few-shot examples as assistant and user turns
+    # Add few-shot examples
     for tokens, ner_tags in few_shot_examples:
         # User provides a sentence
+        temp = f'''
+        Study this taxonomy for classifying named entities:
+        - LOC (Location or physical facilities)
+        - ORG (Organizations, corporations or other entities)
+        - PER (Names of people)
+        - DATE (Date or time)
+        Identify all named entities in the following tokens: {tokens}
+        Additionally, you should add B- to the first token of a given entity and I- to subsequent ones if they exist. 
+        For tokens that are not named entities, mark them as O.
+        '''
         user_message = {
             "role": "user",
-            "content": "Study this taxonomy for classifying named entities:- LOC (Location or physical facilities)- ORG (Organizations, corporations or other entities)- PER (Names of people)- DATE (Date or time)Identify all named entities in the following tokens:{" + " ".join(tokens)+"}\nAdditionally, you should add B- to the first token of a given entity and I- to subsequent ones if they exist. For tokens that are not named entities, mark them as O."
+            "content": temp
         }
         messages.append(user_message)
         # Assistant provides the tags
         assistant_message = {
             "role": "assistant",
-            "content": " ".join(dataset.convert_ner_tags(ner_tags, to_labels=True))
+            "content": " ".join(dataset.convert_ner_tags(ner_tags, to_BIO=True))
         }
         messages.append(assistant_message)
     
     # Add the test sentence
+    temp = f'''
+        Study this taxonomy for classifying named entities:
+        - LOC (Location or physical facilities)
+        - ORG (Organizations, corporations or other entities)
+        - PER (Names of people)
+        - DATE (Date or time)
+        Identify all named entities in the following tokens: {test_tokens}
+        Additionally, you should add B- to the first token of a given entity and I- to subsequent ones if they exist. 
+        For tokens that are not named entities, mark them as O.'''
     user_message = {
         "role": "user",
-        "content": "Study this taxonomy for classifying named entities:- LOC (Location or physical facilities)- ORG (Organizations, corporations or other entities)- PER (Names of people)- DATE (Date or time)Identify all named entities in the following tokens:{" + " ".join(tokens)+"}\nAdditionally, you should add B- to the first token of a given entity and I- to subsequent ones if they exist. For tokens that are not named entities, mark them as O."
-    }
+        "content": temp    
+        }
     messages.append(user_message)
     return messages
 
@@ -170,14 +194,22 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str, default="masakhaner", help="Dataset name")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for initialization")
     parser.add_argument("--cuda", action="store_true", help="Use CUDA when available")
-    parser.add_argument("--load_in_8bit", action="store_true", help="Load model in 8-bit precision")
+    parser.add_argument("--load_in_8bit",default=True, action="store_true", help="Load model in 8-bit precision")
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--balance", action="store_true")
     parser.add_argument("--prompt", type=str, default="", help="Prompt")
     parser.add_argument("--instruction", type=str, default="", help="Instruction")
-    parser.add_argument("--k", type=int, default=1, help="Number of few-shot examples")
+    parser.add_argument("--k", type=int, default=2, help="Number of few-shot examples")
     args = parser.parse_args()
-
+    
+    print("###########################")
+    print("dataset:", args.dataset)
+    print("model_checkpoint:", args.model_checkpoint)
+    print("gen_model_checkpoint:", args.gen_model_checkpoint)
+    print("seed:", args.seed)
+    print("k:", args.k)
+    print("###########################")
+    
     # Set random seed
     set_seed(args.seed)
 
@@ -189,7 +221,6 @@ if __name__ == "__main__":
     # Load embedding model (e.g., SentenceTransformer)
     embedding_model = SentenceTransformer(args.model_checkpoint).cuda()
     batch_size = 128
-
     # Load generation model (Llama 3.1)
     if args.load_in_8bit:
         gen_model = AutoModelForCausalLM.from_pretrained(
@@ -200,8 +231,7 @@ if __name__ == "__main__":
         )
         tokenizer = AutoTokenizer.from_pretrained(
             args.gen_model_checkpoint,
-            token=HF_TOKEN,
-            clean_up_tokenization_spaces=True
+            token=HF_TOKEN
         )
     else:
         gen_model = AutoModelForCausalLM.from_pretrained(
@@ -211,30 +241,28 @@ if __name__ == "__main__":
         )
         tokenizer = AutoTokenizer.from_pretrained(
             args.gen_model_checkpoint,
-            token=HF_TOKEN,
-            clean_up_tokenization_spaces=True
+            token=HF_TOKEN
         )
-
     # Load MasakhaNERDataset
     if args.dataset == "masakhaner":
-        dataset = MasakhaNERDataset(prompt=args.prompt, sample_size=10)
+        dataset = MasakhaNERDataset(sample_size=2)
 
     for lang in dataset.LANGS:
         print(f"Processing language: {lang}")
 
         # Get train and test data
-        train_data = dataset.train_data
-        test_data = dataset.test_data
+        train_data = dataset.train_data[lang]
+        test_data = dataset.test_data[lang]
 
         train_tokens = [sample['tokens'] for sample in train_data]
         train_tags = [sample['ner_tags'] for sample in train_data]
         test_tokens = [sample['tokens'] for sample in test_data]
         test_tags = [sample['ner_tags'] for sample in test_data]
+        test_tags_bio = [dataset.convert_ner_tags(tags, to_BIO=True) for tags in test_tags]
 
         # Prepare texts for embedding
         train_texts = [" ".join(tokens) for tokens in train_tokens]
         test_texts = [" ".join(tokens) for tokens in test_tokens]
-
         # Compute embeddings
         print("Computing embeddings for training data...")
         train_embeddings = embedding_model.encode(train_texts, convert_to_numpy=True, show_progress_bar=True)
@@ -250,8 +278,7 @@ if __name__ == "__main__":
         hyps = []
         prompts = []
         for text_id in tqdm(range(len(test_texts))):
-            test_tokens_example = test_tokens[text_id]
-
+            test_token = test_tokens[text_id]
             # Prepare few-shot examples
             few_shot_examples = []
             if args.k > 0:
@@ -261,7 +288,7 @@ if __name__ == "__main__":
                     few_shot_examples.append((tokens, labels))
 
             # Construct prompt
-            messages = construct_prompt(few_shot_examples, test_tokens_example)
+            messages = construct_prompt(few_shot_examples, test_token)
             prompts.append(messages)
             
             # Get model output
@@ -269,29 +296,23 @@ if __name__ == "__main__":
                 gen_model, tokenizer, args.gen_model_checkpoint, messages, args.seed
             )
 
-            # Process model output
-            num_tokens = len(test_tokens_example)
-            pred_labels = process_model_output(hyp, num_tokens)
+            pred_labels = process_model_output(hyp, num_tokens=len(test_token))
             hyps.append(pred_labels)
-            
-
+        
         # Evaluate using seqeval
-        f1 = f1_score(test_tags, hyps)
-        report = classification_report(test_tags, hyps)
-        print(f"F1 Score for {lang}: {f1}")
+        report = classification_report(test_tags_bio, hyps,zero_division=0)
         print(f"Classification Report for {lang}:\n{report}")
 
         # Save results
         if not os.path.exists(f"{output_dir}/{args.dataset}/{args.gen_model_checkpoint}/{args.model_checkpoint}/seed_{args.seed}/"):
             os.makedirs(f"{output_dir}/{args.dataset}/{args.gen_model_checkpoint}/{args.model_checkpoint}/seed_{args.seed}/")
 
-        obj = {'f1': f1, 'classification_report': report}
-        preds = {"hyp": hyps, "gold": test_tags}
+        preds = {"hyp": hyps, "gold": test_tags_bio}
         all_prompts = {"prompts": prompts}
 
         file_path = f"{output_dir}/{args.dataset}/{args.gen_model_checkpoint}/{args.model_checkpoint}/seed_{args.seed}/eval_{lang}_{args.k}.json"
         with open(file_path, "w") as outfile:
-            json.dump(obj, outfile, indent=4)
+            json.dump(report, outfile, indent=4)
 
         file_path = f"{output_dir}/{args.dataset}/{args.gen_model_checkpoint}/{args.model_checkpoint}/seed_{args.seed}/eval_{lang}_{args.k}_preds.json"
         with open(file_path, "w") as outfile:
@@ -300,4 +321,4 @@ if __name__ == "__main__":
         file_path = f"{output_dir}/{args.dataset}/{args.gen_model_checkpoint}/{args.model_checkpoint}/seed_{args.seed}/eval_{lang}_{args.k}_prompts.json"
         with open(file_path, "w") as outfile:
             json.dump(all_prompts, outfile, indent=4)
-        break
+        

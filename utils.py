@@ -760,22 +760,21 @@ class FIREDataset():
 #MASSIVE (Slot Filling)
 
 class MasakhaNERDataset:
-    def __init__(self, prompt="", src_lang='yor', sample_size=None):
+    def __init__(self,sample_size=0):
         self.all_data = {}
         self.train_data = {}
         self.valid_data = {}
         self.test_data = {}
-        self.prompt = prompt
+        self.sample_size=sample_size
         self.LANGS = [
             'bam', 'bbj', 'ewe', 'fon', 'hau', 'ibo', 'kin', 'lug', 'luo', 'mos',
             'nya', 'pcm', 'sna', 'swa', 'tsn', 'twi', 'wol', 'xho', 'yor', 'zul'
         ]
         self.LABELS = ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "B-DATE", "I-DATE"]
-        self.src_lang = src_lang
-        self.sample_size = sample_size  # New argument to control data size
         self.load_data()
         
-    def convert_ner_tags(self, ner_tags, to_labels=True):
+    def convert_ner_tags(self, ner_tags, to_BIO=True):
+        # Define the mapping from integer tags to string labels
         tag_to_label = {
             0: "O",
             1: "B-PER",
@@ -788,32 +787,29 @@ class MasakhaNERDataset:
             8: "I-DATE"
         }
     
+        # Create the reverse mapping from string labels to integer tags
         label_to_tag = {label: tag for tag, label in tag_to_label.items()}
     
-        if to_labels:
+        if to_BIO:
+        # Convert integer tags to string labels
             return [tag_to_label[tag] for tag in ner_tags]
         else:
+            # Convert string labels to integer tags
             return [label_to_tag[label] for label in ner_tags]
 
     def load_data(self):
-        if self.src_lang not in self.LANGS:
-            raise ValueError(f"Language '{self.src_lang}' is not supported.")
-        
-        dataset = datasets.load_dataset('masakhane/masakhaner2', self.src_lang)
-
-        # Load samples based on sample_size argument
-        if self.sample_size:
-            self.train_data = dataset['train'].select(range(min(self.sample_size, len(dataset['train']))))
-            self.valid_data = dataset['validation'].select(range(min(self.sample_size, len(dataset['validation']))))
-            self.test_data = dataset['test'].select(range(min(self.sample_size, len(dataset['test']))))
-        else:
-            self.train_data = dataset['train']
-            self.valid_data = dataset['validation']
-            self.test_data = dataset['test']
-
-        self.all_data = dataset
-
-        print(f"Data loaded for language: {self.src_lang}")
-        print(f"Training samples: {len(self.train_data)}")
-        print(f"Validation samples: {len(self.valid_data)}")
-        print(f"Test samples: {len(self.test_data)}")
+            for lang in self.LANGS:
+                dataset = datasets.load_dataset('masakhane/masakhaner2', lang)
+                # Load samples based on sample_size argument
+                if self.sample_size>0:
+                    self.train_data[lang] = dataset['train'].select(range(min(self.sample_size, len(dataset['train']))))
+                    self.valid_data[lang] = dataset['validation'].select(range(min(self.sample_size, len(dataset['validation']))))
+                    self.test_data[lang] = dataset['test'].select(range(min(self.sample_size, len(dataset['test']))))
+                else:
+                    self.train_data[lang] = dataset['train']
+                    self.valid_data[lang] = dataset['validation']
+                    self.test_data[lang] = dataset['test']
+            self.all_data = dataset
+            print(f"Total training samples: {len(self.train_data)}")
+            print(f"Total validation samples: {len(self.valid_data)}")
+            print(f"Total test samples: {len(self.test_data)}")
