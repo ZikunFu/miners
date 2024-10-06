@@ -10,14 +10,14 @@ from collections import Counter
 from sentence_transformers import SentenceTransformer
 from utils import MasakhaNERDataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from seqeval.metrics import classification_report, f1_score
+from seqeval.metrics import classification_report
 from transformers.utils import logging
 logging.set_verbosity_error() 
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 
 OPENAI_TOKEN = ""
 COHERE_TOKEN = ""
-HF_TOKEN = "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"
+HF_TOKEN = ""
 
 def argmax(array):
     """argmax with deterministic pseudorandom tie breaking."""
@@ -38,9 +38,8 @@ def set_seed(seed):
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
-    torch.backends.cudnn.benchmark = True
     
-def get_llama3_instruct_chat_response(gen_model, tokenizer, gen_model_checkpoint, messages, seed,verbose=True):
+def get_llama3_instruct_chat_response(gen_model, tokenizer, gen_model_checkpoint, messages, seed,verbose=False):
     input_ids = tokenizer.apply_chat_template(
         messages,
         add_generation_prompt=True,
@@ -85,10 +84,10 @@ def retrieve_ids(train_embeddings, test_embeddings, train_labels, k, balance=Fal
             num_of_batches += 1
 
         for i in range(num_of_batches):
-            train_embedding = torch.FloatTensor(train_embeddings[i*batch_size:(i+1)*batch_size]).unsqueeze(1)#.cuda()
+            train_embedding = torch.FloatTensor(train_embeddings[i*batch_size:(i+1)*batch_size]).unsqueeze(1).cuda()
             
             test_embedding = torch.FloatTensor(test_embeddings[test_id]).unsqueeze(0)
-            test_embedding = test_embedding.expand(len(train_embedding), -1).unsqueeze(1)#.cuda()
+            test_embedding = test_embedding.expand(len(train_embedding), -1).unsqueeze(1).cuda()
             
             dist = torch.cdist(test_embedding, train_embedding, p=2, compute_mode='use_mm_for_euclid_dist_if_necessary').squeeze().tolist()
 
@@ -169,6 +168,7 @@ def construct_prompt(few_shot_examples, test_tokens):
     return messages
 
 def process_model_output(output, num_tokens):
+    
     pred_labels = output.strip().split()
     # Handle mismatch in the number of tokens and predicted labels
     if len(pred_labels) < num_tokens:
@@ -178,7 +178,18 @@ def process_model_output(output, num_tokens):
         # Truncate to match the number of tokens
         pred_labels = pred_labels[:num_tokens]
     return pred_labels
-
+def convert_numpy_types(obj):
+    if isinstance(obj, dict):
+        return {k: convert_numpy_types(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(v) for v in obj]
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    else:
+        return obj
+    
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -190,7 +201,7 @@ if __name__ == "__main__":
         "--gen_model_checkpoint",
         default="meta-llama/Meta-Llama-3.1-8B-Instruct",
         type=str,
-        help="Path to pre-trained generation model (Llama 3.1)")
+        help="Path to pre-trained generation model")
     parser.add_argument("--dataset", type=str, default="masakhaner", help="Dataset name")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for initialization")
     parser.add_argument("--cuda", action="store_true", help="Use CUDA when available")
@@ -245,7 +256,7 @@ if __name__ == "__main__":
         )
     # Load MasakhaNERDataset
     if args.dataset == "masakhaner":
-        dataset = MasakhaNERDataset(sample_size=2)
+        dataset = MasakhaNERDataset()
 
     for lang in dataset.LANGS:
         print(f"Processing language: {lang}")
@@ -301,6 +312,8 @@ if __name__ == "__main__":
         
         # Evaluate using seqeval
         report = classification_report(test_tags_bio, hyps,zero_division=0)
+        report_dict=classification_report(test_tags_bio, hyps,zero_division=0,output_dict=True)
+        report_dict = convert_numpy_types(report_dict)
         print(f"Classification Report for {lang}:\n{report}")
 
         # Save results
@@ -312,7 +325,7 @@ if __name__ == "__main__":
 
         file_path = f"{output_dir}/{args.dataset}/{args.gen_model_checkpoint}/{args.model_checkpoint}/seed_{args.seed}/eval_{lang}_{args.k}.json"
         with open(file_path, "w") as outfile:
-            json.dump(report, outfile, indent=4)
+            json.dump(report_dict, outfile, indent=4)
 
         file_path = f"{output_dir}/{args.dataset}/{args.gen_model_checkpoint}/{args.model_checkpoint}/seed_{args.seed}/eval_{lang}_{args.k}_preds.json"
         with open(file_path, "w") as outfile:
