@@ -74,7 +74,7 @@ def retrieve_ids(train_embeddings, test_embeddings, train_labels, k, balance=Fal
     all_samples = []
     for test_id in tqdm(range(len(test_embeddings))):
         dists = []
-        batch_size = 128
+        batch_size = 128                                            
         if len(train_embeddings) < batch_size:
             batch_size = len(test_embeddings) // 2
         
