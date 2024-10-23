@@ -810,9 +810,12 @@ class MasakhaNERDataset:
                     self.valid_data[lang] = dataset['validation']
                     self.test_data[lang] = dataset['test']
             self.all_data = dataset
-            print(f"Total training samples: {len(self.train_data)}")
-            print(f"Total validation samples: {len(self.valid_data)}")
-            print(f"Total test samples: {len(self.test_data)}")
+            total_train_samples = sum([len(data) for data in self.train_data.values()])
+            total_valid_samples = sum([len(data) for data in self.valid_data.values()])
+            total_test_samples = sum([len(data) for data in self.test_data.values()])
+            print(f"Total training samples: {total_train_samples}")
+            print(f"Total validation samples: {total_valid_samples}")
+            print(f"Total test samples: {total_test_samples}")
 
 class XLSUMDataset:
     def __init__(self,sample_size=0):

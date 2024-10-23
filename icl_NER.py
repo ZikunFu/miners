@@ -75,7 +75,7 @@ def retrieve_ids(train_embeddings, test_embeddings, train_labels, k, balance=Fal
     all_samples = []
     for test_id in tqdm(range(len(test_embeddings))):
         dists = []
-        batch_size = 128                                            
+        batch_size = 128
         if len(train_embeddings) < batch_size:
             batch_size = len(test_embeddings) // 2
         
@@ -199,12 +199,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model_checkpoint",
-        default="sentence-transformers/LaBSE",
+        default="intfloat/multilingual-e5-base",
+        #choices=["sentence-transformers/LaBSE", "intfloat/multilingual-e5-base"],
         type=str,
         help="Path to pre-trained embedding model")
     parser.add_argument(
         "--gen_model_checkpoint",
-        default="CohereForAI/aya-101",
+        default="meta-llama/Meta-Llama-3.1-8B-Instruct",
         #choices=["meta-llama/Meta-Llama-3.1-8B-Instruct", "google/gemma-2-9b-it"],
         type=str,
         help="Path to pre-trained generation model")
@@ -239,7 +240,7 @@ if __name__ == "__main__":
     embedding_model = SentenceTransformer(args.model_checkpoint).cuda()
     batch_size = 128
     # Load generation model (Llama 3.1)
-    if(args.gen_model_checkpoint == "Meta-Llama-3.1-8B-Instruct"):
+    if(args.gen_model_checkpoint == "meta-llama/Meta-Llama-3.1-8B-Instruct"):
         gen_model = AutoModelForCausalLM.from_pretrained(
             args.gen_model_checkpoint,
             token=HF_TOKEN,
