@@ -813,3 +813,35 @@ class MasakhaNERDataset:
             print(f"Total training samples: {len(self.train_data)}")
             print(f"Total validation samples: {len(self.valid_data)}")
             print(f"Total test samples: {len(self.test_data)}")
+
+class XLSUMDataset:
+    def __init__(self,sample_size=0):
+        self.all_data = {}
+        self.train_data = {}
+        self.valid_data = {}
+        self.test_data = {}
+        self.sample_size=sample_size
+        self.LANGS = [
+            'bam', 'bbj', 'ewe', 'fon', 'hau', 'ibo', 'kin', 'lug', 'luo', 'mos',
+            'nya', 'pcm', 'sna', 'swa', 'tsn', 'twi', 'wol', 'xho', 'yor', 'zul'
+        ]
+        self.LABELS = ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "B-DATE", "I-DATE"]
+        self.load_data()
+
+    def load_data(self):
+           # needs more work
+            for lang in self.LANGS:
+                dataset = datasets.load_dataset('csebuetnlp/xlsum', lang)
+                # Load samples based on sample_size argument
+                if self.sample_size>0:
+                    self.train_data[lang] = dataset['train'].select(range(min(self.sample_size, len(dataset['train']))))
+                    self.valid_data[lang] = dataset['validation'].select(range(min(self.sample_size, len(dataset['validation']))))
+                    self.test_data[lang] = dataset['test'].select(range(min(self.sample_size, len(dataset['test']))))
+                else:
+                    self.train_data[lang] = dataset['train']
+                    self.valid_data[lang] = dataset['validation']
+                    self.test_data[lang] = dataset['test']
+            self.all_data = dataset
+            print(f"Total training samples: {len(self.train_data)}")
+            print(f"Total validation samples: {len(self.valid_data)}")
+            print(f"Total test samples: {len(self.test_data)}")
