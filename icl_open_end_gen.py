@@ -11,16 +11,10 @@ from sentence_transformers import SentenceTransformer
 from utils import MasakhaNERDataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from seqeval.metrics import classification_report
-from nltk.translate.bleu_score import sentence_bleu
 from rouge_score import rouge_scorer
 from bert_score import score as bert_score
-from nltk.translate.meteor_score import meteor_score
 import numpy as np
 from transformers.utils import logging
-import nltk
-
-# Download necessary NLTK resources for tokenization
-nltk.download('punkt')
 
 logging.set_verbosity_error() 
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
@@ -84,7 +78,7 @@ def retrieve_ids(train_embeddings, test_embeddings, train_labels, k, balance=Fal
     all_samples = []
     for test_id in tqdm(range(len(test_embeddings))):
         dists = []
-        batch_size = 1                         
+        batch_size = 1                              ########change back to 128 
         if len(train_embeddings) < batch_size:
             batch_size = len(test_embeddings) // 2
         
@@ -192,8 +186,6 @@ def distinct_n_grams(text, n):
     return len(n_grams) / len(text) if len(text) > 0 else 0
 
 def evaluate_generation_metrics(hyps, refs):
-    bleu_scores = []
-    meteor_scores = []
     distinct_1_scores = []
     distinct_2_scores = []
     rouge1_scores = []
@@ -203,19 +195,10 @@ def evaluate_generation_metrics(hyps, refs):
     rouge = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
 
     for hyp, ref in zip(hyps, refs):
-        hyp_tokens = nltk.word_tokenize(hyp)
-        ref_tokens = nltk.word_tokenize(ref)
-
-        bleu = sentence_bleu([ref.split()], hyp.split())
-        bleu_scores.append(bleu)
-
         rouge_scores = rouge.score(ref, hyp)
         rouge1_scores.append(rouge_scores['rouge1'].fmeasure)
         rouge2_scores.append(rouge_scores['rouge2'].fmeasure)
         rougeL_scores.append(rouge_scores['rougeL'].fmeasure)
-
-        meteor = meteor_score([ref_tokens], hyp_tokens)
-        meteor_scores.append(meteor)
 
         distinct_1 = distinct_n_grams(hyp.split(), 1)
         distinct_2 = distinct_n_grams(hyp.split(), 2)
@@ -225,17 +208,15 @@ def evaluate_generation_metrics(hyps, refs):
     P, R, F1 = bert_score(hyps, refs, lang='en', rescale_with_baseline=True)
 
     report_dict = {
-        "BLEU": np.mean(bleu_scores),
         "ROUGE-1": np.mean(rouge1_scores),
         "ROUGE-2": np.mean(rouge2_scores),
         "ROUGE-L": np.mean(rougeL_scores),
-        "METEOR": np.mean(meteor_scores),
         "BERTScore (P)": np.mean(P),
         "BERTScore (R)": np.mean(R),
         "BERTScore (F1)": np.mean(F1),
         "Distinct-1": np.mean(distinct_1_scores),
         "Distinct-2": np.mean(distinct_2_scores),
-        "Ensemble": np.mean([np.mean(bleu_scores), np.mean(rouge1_scores), np.mean(rouge2_scores), np.mean(rougeL_scores), np.mean(meteor_scores), np.mean(F1)])
+        "Ensemble": np.mean([np.mean(rouge1_scores), np.mean(rouge2_scores), np.mean(rougeL_scores), np.mean(F1)])
     }
 
     return report_dict
