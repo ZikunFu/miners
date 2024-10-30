@@ -16,6 +16,8 @@ from bert_score import score as bert_score
 import numpy as np
 from transformers.utils import logging
 
+
+
 logging.set_verbosity_error() 
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 
@@ -161,7 +163,7 @@ def construct_prompt(few_shot_examples, test_tokens):
     messages.append(user_message)
     return messages
 
-def process_model_output(output, num_tokens):
+
     pred_labels = output.strip().split()
     if len(pred_labels) < num_tokens:
         pred_labels.extend(['O'] * (num_tokens - len(pred_labels)))
@@ -181,10 +183,20 @@ def convert_numpy_types(obj):
     else:
         return obj
 
+# Define additional helper functions
 def distinct_n_grams(text, n):
     n_grams = set(zip(*[text[i:] for i in range(n)]))
     return len(n_grams) / len(text) if len(text) > 0 else 0
 
+def process_model_output(output, num_tokens):
+    pred_labels = output.strip().split()
+    if len(pred_labels) < num_tokens:
+        pred_labels.extend(['O'] * (num_tokens - len(pred_labels)))
+    elif len(pred_labels) > num_tokens:
+        pred_labels = pred_labels[:num_tokens]
+    return pred_labels
+
+# Evaluation Metrics Function
 def evaluate_generation_metrics(hyps, refs):
     distinct_1_scores = []
     distinct_2_scores = []
@@ -192,8 +204,10 @@ def evaluate_generation_metrics(hyps, refs):
     rouge2_scores = []
     rougeL_scores = []
 
+    # Initialize ROUGE scorer
     rouge = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
 
+    # Calculate ROUGE and Distinct metrics
     for hyp, ref in zip(hyps, refs):
         rouge_scores = rouge.score(ref, hyp)
         rouge1_scores.append(rouge_scores['rouge1'].fmeasure)
@@ -205,152 +219,68 @@ def evaluate_generation_metrics(hyps, refs):
         distinct_1_scores.append(distinct_1)
         distinct_2_scores.append(distinct_2)
 
-    P, R, F1 = bert_score(hyps, refs, lang='en', rescale_with_baseline=True)
+    # Calculate BERTScore
+    print("Calculating BERTScore...")
+    P, R, F1 = bert_score(hyps, refs, lang='en', rescale_with_baseline=False)
+    print("BERTScore calculated.")
 
+    # Convert tensors to Python floats
+    P, R, F1 = P.cpu().numpy().astype(float), R.cpu().numpy().astype(float), F1.cpu().numpy().astype(float)
+
+    # Organize report dictionary
     report_dict = {
-        "ROUGE-1": np.mean(rouge1_scores),
-        "ROUGE-2": np.mean(rouge2_scores),
-        "ROUGE-L": np.mean(rougeL_scores),
-        "BERTScore (P)": np.mean(P),
-        "BERTScore (R)": np.mean(R),
-        "BERTScore (F1)": np.mean(F1),
-        "Distinct-1": np.mean(distinct_1_scores),
-        "Distinct-2": np.mean(distinct_2_scores),
-        "Ensemble": np.mean([np.mean(rouge1_scores), np.mean(rouge2_scores), np.mean(rougeL_scores), np.mean(F1)])
+        "ROUGE-1": float(np.mean(rouge1_scores)),
+        "ROUGE-2": float(np.mean(rouge2_scores)),
+        "ROUGE-L": float(np.mean(rougeL_scores)),
+        "BERTScore (P)": float(np.mean(P)),
+        "BERTScore (R)": float(np.mean(R)),
+        "BERTScore (F1)": float(np.mean(F1)),
+        "Distinct-1": float(np.mean(distinct_1_scores)),
+        "Distinct-2": float(np.mean(distinct_2_scores)),
+        "Ensemble": float(np.mean([np.mean(rouge1_scores), np.mean(rouge2_scores), np.mean(rougeL_scores), np.mean(F1)]))
     }
 
     return report_dict
 
+# Main function setup
 if __name__ == "__main__":
+    print("CUDA available:", torch.cuda.is_available())
+
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--model_checkpoint",
-        default="sentence-transformers/LaBSE",
-        type=str,
-        help="Path to pre-trained embedding model")
-    parser.add_argument(
-        "--gen_model_checkpoint",
-        default="meta-llama/Meta-Llama-3.1-8B-Instruct",
-        type=str,
-        help="Path to pre-trained generation model")
+    parser.add_argument("--model_checkpoint", default="sentence-transformers/LaBSE", type=str, help="Path to embedding model")
+    parser.add_argument("--gen_model_checkpoint", default="meta-llama/Meta-Llama-3.1-8B-Instruct", type=str, help="Generation model")
     parser.add_argument("--dataset", type=str, default="masakhaner", help="Dataset name")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for initialization")
     parser.add_argument("--cuda", action="store_true", help="Use CUDA when available")
-    parser.add_argument("--load_in_4bit",default=True, action="store_true", help="Load model in 4-bit precision") 
-    parser.add_argument("--verbose", action="store_true")
-    parser.add_argument("--balance", action="store_true")
-    parser.add_argument("--prompt", type=str, default="", help="Prompt")
-    parser.add_argument("--instruction", type=str, default="", help="Instruction")
-    parser.add_argument("--k", type=int, default=2, help="Number of few-shot examples")
     args = parser.parse_args()
 
-    print("###########################")
-    print("dataset:", args.dataset)
-    print("model_checkpoint:", args.model_checkpoint)
-    print("gen_model_checkpoint:", args.gen_model_checkpoint)
-    print("seed:", args.seed)
-    print("k:", args.k)
-    print("###########################")
+    # Set random seed for reproducibility
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    if args.cuda:
+        torch.cuda.manual_seed(args.seed)
 
-    set_seed(args.seed)
+    # Load embedding and generation models
+    embedding_model = SentenceTransformer(args.model_checkpoint).cuda() if args.cuda else SentenceTransformer(args.model_checkpoint)
+    gen_model = AutoModelForCausalLM.from_pretrained(args.gen_model_checkpoint).cuda() if args.cuda else AutoModelForCausalLM.from_pretrained(args.gen_model_checkpoint)
+    tokenizer = AutoTokenizer.from_pretrained(args.gen_model_checkpoint)
 
+    # Placeholder dataset - replace this section with actual data loading
+    hyps = ["The quick brown fox jumps over the lazy dog", "A journey of a thousand miles begins with a single step"]
+    refs = ["The quick brown fox leaped over a lazy dog", "A journey of a thousand miles starts with one step"]
+
+    # Evaluate and display metrics
+    print("Evaluating generation metrics...")
+    report = evaluate_generation_metrics(hyps, refs)
+    print("Evaluation Report:")
+    print(json.dumps(report, indent=4))
+
+    # Save report to JSON file
     output_dir = "logs/save_icl_NER"
-    if args.load_in_4bit:
-        output_dir += "_4bit"
-
-    embedding_model = SentenceTransformer(args.model_checkpoint).cuda()
-
-    if args.load_in_4bit:
-        gen_model = AutoModelForCausalLM.from_pretrained(
-            args.gen_model_checkpoint,
-            token=HF_TOKEN,
-            device_map="auto",
-            load_in_4bit=True
-        )
-        tokenizer = AutoTokenizer.from_pretrained(
-            args.gen_model_checkpoint,
-            token=HF_TOKEN
-        )
-    else:
-        gen_model = AutoModelForCausalLM.from_pretrained(
-            args.gen_model_checkpoint,
-            token=HF_TOKEN,
-            device_map="auto"
-        )
-        tokenizer = AutoTokenizer.from_pretrained(
-            args.gen_model_checkpoint,
-            token=HF_TOKEN
-        )
-
-    if args.dataset == "masakhaner":
-        dataset = MasakhaNERDataset()
-
-    for lang in dataset.LANGS:
-        print(f"Processing language: {lang}")
-
-        train_data = dataset.train_data[lang]
-        test_data = dataset.test_data[lang]
-
-        train_tokens = [sample['tokens'] for sample in train_data]
-        train_tags = [sample['ner_tags'] for sample in train_data]
-        test_tokens = [sample['tokens'] for sample in test_data]
-        test_tags = [sample['ner_tags'] for sample in test_data]
-        test_tags_bio = [dataset.convert_ner_tags(tags, to_BIO=True) for tags in test_tags]
-
-        train_texts = [" ".join(tokens) for tokens in train_tokens]
-        test_texts = [" ".join(tokens) for tokens in test_tokens]
-        
-        print("Computing embeddings for training data...")
-        train_embeddings = embedding_model.encode(train_texts, convert_to_numpy=True, show_progress_bar=True)
-        print("Computing embeddings for test data...")
-        test_embeddings = embedding_model.encode(test_texts, convert_to_numpy=True, show_progress_bar=True)
-
-        if args.k > 0:
-            all_few_shot_samples_ids = retrieve_ids(
-                train_embeddings, test_embeddings, train_tags, k=args.k
-            )
-
-        hyps = []
-        refs = [" ".join(tags) for tags in test_tags_bio]  
-        prompts = []
-        
-        for text_id in tqdm(range(len(test_texts))):
-            test_token = test_tokens[text_id]
-
-            few_shot_examples = []
-            if args.k > 0:
-                for few_shot_sample_id in all_few_shot_samples_ids[text_id]:
-                    tokens = train_tokens[few_shot_sample_id]
-                    labels = train_tags[few_shot_sample_id]
-                    few_shot_examples.append((tokens, labels))
-
-            messages = construct_prompt(few_shot_examples, test_token)
-            prompts.append(messages)
-            
-            hyp = get_llama3_instruct_chat_response(
-                gen_model, tokenizer, args.gen_model_checkpoint, messages, args.seed
-            )
-
-            pred_labels = process_model_output(hyp, num_tokens=len(test_token))
-            hyps.append(" ".join(pred_labels))  
-        
-        report = evaluate_generation_metrics(hyps, refs)
-        print(f"Evaluation Report for {lang}:\n{report}")
-
-        if not os.path.exists(f"{output_dir}/{args.dataset}/{args.gen_model_checkpoint}/{args.model_checkpoint}/seed_{args.seed}/"):
-            os.makedirs(f"{output_dir}/{args.dataset}/{args.gen_model_checkpoint}/{args.model_checkpoint}/seed_{args.seed}/")
-
-        preds = {"hyp": hyps, "gold": test_tags_bio}
-        all_prompts = {"prompts": prompts}
-
-        file_path = f"{output_dir}/{args.dataset}/{args.gen_model_checkpoint}/{args.model_checkpoint}/seed_{args.seed}/eval_{lang}_{args.k}.json"
-        with open(file_path, "w") as outfile:
-            json.dump(report, outfile, indent=4)
-
-        file_path = f"{output_dir}/{args.dataset}/{args.gen_model_checkpoint}/{args.model_checkpoint}/seed_{args.seed}/eval_{lang}_{args.k}_preds.json"
-        with open(file_path, "w") as outfile:
-            json.dump(preds, outfile, indent=4)
-
-        file_path = f"{output_dir}/{args.dataset}/{args.gen_model_checkpoint}/{args.model_checkpoint}/seed_{args.seed}/eval_{lang}_{args.k}_prompts.json"
-        with open(file_path, "w") as outfile:
-            json.dump(all_prompts, outfile, indent=4)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    output_path = os.path.join(output_dir, "evaluation_report.json")
+    with open(output_path, "w") as outfile:
+        json.dump(report, outfile, indent=4)
+    print(f"Report saved successfully to {output_path}")

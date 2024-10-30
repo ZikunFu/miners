@@ -59,22 +59,23 @@ def get_llama3_instruct_chat_response(gen_model, tokenizer, gen_model_checkpoint
         temperature=0.2,
         top_p=1
     )
-    inputs = tokenizer.decode(input_ids[0], skip_special_tokens=False)
+    #inputs = tokenizer.decode(input_ids[0], skip_special_tokens=False)
     response = outputs[0][input_ids.shape[-1]:]
     response = tokenizer.decode(response, skip_special_tokens=True)
     if(verbose):
         print("\n"+"="*35+"INPUT"+"="*35)
-        print(inputs)
+        #print(inputs)
         print("="*35+"RESPONSE"+"="*43)
         print(response)
         print("="*70)
     return response
 
+
 def retrieve_ids(train_embeddings, test_embeddings, train_labels, k, balance=False, all_possible_labels=[]):
     all_samples = []
     for test_id in tqdm(range(len(test_embeddings))):
         dists = []
-        batch_size = 128                                            
+        batch_size = 128
         if len(train_embeddings) < batch_size:
             batch_size = len(test_embeddings) // 2
         
@@ -117,18 +118,22 @@ def retrieve_ids(train_embeddings, test_embeddings, train_labels, k, balance=Fal
         all_samples.append(all_indices)
     return all_samples
 
-def construct_prompt(few_shot_examples, test_tokens):
+def construct_prompt(few_shot_examples, test_tokens, model_checkpoint):
     messages = []
-    system_message = {
-        "role": "system",
-        "content": "You are a helpful assistant that performs named entity recognition and output only labels."
-    }
-    messages.append(system_message)
+    assistant_role = "assistant"
+    if model_checkpoint == "Meta-Llama-3.1-8B-Instruct":
+        system_message = {
+            "role": "system",
+            "content": "You are a helpful assistant that performs named entity recognition and output only labels."
+        }
+        messages.append(system_message)
+    elif model_checkpoint == "google/gemma-2-9b-it":
+        assistant_role = "model"
     
     # Add few-shot examples
     for tokens, ner_tags in few_shot_examples:
         # User provides a sentence
-        temp = f'''
+        content = f'''
         Study this taxonomy for classifying named entities:
         - LOC (Location or physical facilities)
         - ORG (Organizations, corporations or other entities)
@@ -140,18 +145,18 @@ def construct_prompt(few_shot_examples, test_tokens):
         '''
         user_message = {
             "role": "user",
-            "content": temp
+            "content": content
         }
         messages.append(user_message)
         # Assistant provides the tags
         assistant_message = {
-            "role": "assistant",
+            "role": assistant_role,
             "content": " ".join(dataset.convert_ner_tags(ner_tags, to_BIO=True))
         }
         messages.append(assistant_message)
     
     # Add the test sentence
-    temp = f'''
+    content = f'''
         Study this taxonomy for classifying named entities:
         - LOC (Location or physical facilities)
         - ORG (Organizations, corporations or other entities)
@@ -162,7 +167,7 @@ def construct_prompt(few_shot_examples, test_tokens):
         For tokens that are not named entities, mark them as O.'''
     user_message = {
         "role": "user",
-        "content": temp    
+        "content": content    
         }
     messages.append(user_message)
     return messages
@@ -194,12 +199,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model_checkpoint",
-        default="sentence-transformers/LaBSE",
+        default="intfloat/multilingual-e5-base",
+        #choices=["sentence-transformers/LaBSE", "intfloat/multilingual-e5-base"],
         type=str,
         help="Path to pre-trained embedding model")
     parser.add_argument(
         "--gen_model_checkpoint",
         default="meta-llama/Meta-Llama-3.1-8B-Instruct",
+        #choices=["meta-llama/Meta-Llama-3.1-8B-Instruct", "google/gemma-2-9b-it"],
         type=str,
         help="Path to pre-trained generation model")
     parser.add_argument("--dataset", type=str, default="masakhaner", help="Dataset name")
@@ -233,30 +240,39 @@ if __name__ == "__main__":
     embedding_model = SentenceTransformer(args.model_checkpoint).cuda()
     batch_size = 128
     # Load generation model (Llama 3.1)
-    if args.load_in_8bit:
+    if(args.gen_model_checkpoint == "meta-llama/Meta-Llama-3.1-8B-Instruct"):
+        gen_model = AutoModelForCausalLM.from_pretrained(
+            args.gen_model_checkpoint,
+            token=HF_TOKEN,
+            device_map="auto",
+            load_in_8bit=True
+    )
+    elif(args.gen_model_checkpoint == "google/gemma-2-9b-it"):
+        gen_model = AutoModelForCausalLM.from_pretrained(
+            args.gen_model_checkpoint,
+            token=HF_TOKEN,
+            device_map="auto",
+            load_in_8bit=True,
+            torch_dtype=torch.bfloat16
+        )
+    elif(args.gen_model_checkpoint == "CohereForAI/aya-101"):
         gen_model = AutoModelForCausalLM.from_pretrained(
             args.gen_model_checkpoint,
             token=HF_TOKEN,
             device_map="auto",
             load_in_8bit=True
         )
-        tokenizer = AutoTokenizer.from_pretrained(
-            args.gen_model_checkpoint,
-            token=HF_TOKEN
-        )
     else:
-        gen_model = AutoModelForCausalLM.from_pretrained(
-            args.gen_model_checkpoint,
-            token=HF_TOKEN,
-            device_map="auto"
-        )
-        tokenizer = AutoTokenizer.from_pretrained(
-            args.gen_model_checkpoint,
-            token=HF_TOKEN
-        )
+        raise ValueError("Invalid generation model checkpoint")
+    
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.gen_model_checkpoint,
+        token=HF_TOKEN
+    )
     # Load MasakhaNERDataset
     if args.dataset == "masakhaner":
         dataset = MasakhaNERDataset()
+        
 
     for lang in dataset.LANGS:
         print(f"Processing language: {lang}")
@@ -281,6 +297,7 @@ if __name__ == "__main__":
         test_embeddings = embedding_model.encode(test_texts, convert_to_numpy=True, show_progress_bar=True)
 
         # Retrieve k-nearest neighbors
+        print("Retrieve "+str(args.k)+"-nearest neighbors...")
         if args.k > 0:
             all_few_shot_samples_ids = retrieve_ids(
                 train_embeddings, test_embeddings, train_tags, k=args.k
@@ -288,6 +305,7 @@ if __name__ == "__main__":
 
         hyps = []
         prompts = []
+        print("Generate responses...")
         for text_id in tqdm(range(len(test_texts))):
             test_token = test_tokens[text_id]
             # Prepare few-shot examples
@@ -299,7 +317,7 @@ if __name__ == "__main__":
                     few_shot_examples.append((tokens, labels))
 
             # Construct prompt
-            messages = construct_prompt(few_shot_examples, test_token)
+            messages = construct_prompt(few_shot_examples, test_token, args.gen_model_checkpoint)
             prompts.append(messages)
             
             # Get model output
@@ -312,7 +330,7 @@ if __name__ == "__main__":
         
         # Evaluate using seqeval
         report = classification_report(test_tags_bio, hyps,zero_division=0)
-        report_dict=classification_report(test_tags_bio, hyps,zero_division=0,output_dict=True)
+        report_dict = classification_report(test_tags_bio, hyps,zero_division=0,output_dict=True)
         report_dict = convert_numpy_types(report_dict)
         print(f"Classification Report for {lang}:\n{report}")
 
