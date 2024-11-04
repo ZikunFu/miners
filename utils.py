@@ -817,34 +817,61 @@ class MasakhaNERDataset:
             print(f"Total validation samples: {total_valid_samples}")
             print(f"Total test samples: {total_test_samples}")
 
-class XLSUMDataset:
-    def __init__(self,sample_size=0):
+
+class XLSumDataset:
+    def __init__(self, sample_size=0):
         self.all_data = {}
         self.train_data = {}
         self.valid_data = {}
         self.test_data = {}
-        self.sample_size=sample_size
+        self.sample_size = sample_size
+
+        # Update with correct language keys as per XLSum documentation
         self.LANGS = [
-            'bam', 'bbj', 'ewe', 'fon', 'hau', 'ibo', 'kin', 'lug', 'luo', 'mos',
-            'nya', 'pcm', 'sna', 'swa', 'tsn', 'twi', 'wol', 'xho', 'yor', 'zul'
-        ]
-        self.LABELS = ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "B-DATE", "I-DATE"]
+    "amharic", "arabic", "azerbaijani", "bengali", "burmese", 
+    "chinese_simplified", "chinese_traditional", "english", "french", 
+    "gujarati", "hausa", "hindi", "igbo", "indonesian", "japanese", 
+    "kirundi", "korean", "kyrgyz", "marathi", "nepali", "oromo", "pashto", 
+    "persian", "pidgin", "portuguese", "punjabi", "russian", 
+    "scottish_gaelic", "serbian_cyrillic", "serbian_latin", "sinhala", 
+    "somali", "spanish", "swahili", "tamil", "telugu", "thai", "tigrinya", 
+    "turkish", "ukrainian", "urdu", "uzbek", "vietnamese", "welsh", "yoruba"
+]
+
         self.load_data()
 
     def load_data(self):
-           # needs more work
-            for lang in self.LANGS:
-                dataset = datasets.load_dataset('csebuetnlp/xlsum', lang)
-                # Load samples based on sample_size argument
-                if self.sample_size>0:
-                    self.train_data[lang] = dataset['train'].select(range(min(self.sample_size, len(dataset['train']))))
-                    self.valid_data[lang] = dataset['validation'].select(range(min(self.sample_size, len(dataset['validation']))))
-                    self.test_data[lang] = dataset['test'].select(range(min(self.sample_size, len(dataset['test']))))
-                else:
-                    self.train_data[lang] = dataset['train']
-                    self.valid_data[lang] = dataset['validation']
-                    self.test_data[lang] = dataset['test']
-            self.all_data = dataset
-            print(f"Total training samples: {len(self.train_data)}")
-            print(f"Total validation samples: {len(self.valid_data)}")
-            print(f"Total test samples: {len(self.test_data)}")
+        for lang in self.LANGS:
+            # Load the dataset for each language
+            dataset = datasets.load_dataset("csebuetnlp/xlsum", lang)
+
+            # Prepare train, validation, and test data structures
+            self.all_data[lang] = {"source": [], "target": []}
+            self.train_data[lang] = {"source": [], "target": []}
+            self.valid_data[lang] = {"source": [], "target": []}
+            self.test_data[lang] = {"source": [], "target": []}
+
+            # Load samples based on sample_size argument
+            splits = ["train", "validation", "test"]
+            for split in splits:
+                split_data = dataset[split]
+                num_samples = self.sample_size if self.sample_size > 0 else len(split_data)
+
+                for i in range(num_samples):
+                    text = split_data[i]["text"]
+                    summary = split_data[i]["summary"]
+                    self.all_data[lang]["source"].append(text)
+                    self.all_data[lang]["target"].append(summary)
+                    
+                    if split == "train":
+                        self.train_data[lang]["source"].append(text)
+                        self.train_data[lang]["target"].append(summary)
+                    elif split == "validation":
+                        self.valid_data[lang]["source"].append(text)
+                        self.valid_data[lang]["target"].append(summary)
+                    elif split == "test":
+                        self.test_data[lang]["source"].append(text)
+                        self.test_data[lang]["target"].append(summary)
+
+        print(f"Total languages loaded: {len(self.LANGS)}")
+        print("Sample data loaded for 'english':", self.train_data["english"]["source"][:3])
