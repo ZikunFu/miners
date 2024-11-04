@@ -72,6 +72,167 @@ def get_llama3_instruct_chat_response(gen_model, tokenizer, messages, verbose=Tr
         print("="*70)
     return response
 
+# Construct prompt for open-ended generation task
+def construct_prompt(few_shot_examples, test_tokens, model_checkpoint):
+    messages = []
+    assistant_role = "assistant"
+    if model_checkpoint == "Meta-Llama-3.1-8B-Instruct":
+        system_message = {
+            "role": "system",
+            "content": "You are a helpful assistant that performs open-ended generation and outputs completed prompts in multiple languages." 
+            "The languages are amharic, arabic, azerbaijani, bengali, burmese, chinese_simplified, chinese_traditional, english, french, gujarati, hausa, hindi, igbo, indonesian, japanese, kirundi, korean, kyrgyz, marathi, nepali, oromo, pashto, persian, pidgin, portuguese, punjabi, russian, scottish_gaelic, serbian_cyrillic, serbian_latin, sinhala, somali, spanish, swahili, tamil, telugu, thai, tigrinya, turkish, ukrainian, urdu, uzbek, vietnamese, welsh, yoruba"
+        }
+        messages.append(system_message)
+    elif model_checkpoint == "google/gemma-2-9b-it":
+        assistant_role = "model"
+    
+    # Add few-shot examples
+    for tokens, example_content in few_shot_examples:
+        user_message = {
+            "role": "user",
+            "content": f'''
+        "Once upon a time in a world without electricity...",
+            "Describe a day in the life of a lighthouse keeper on a remote island.",
+            "What do you think the future of transportation will look like in 50 years?",
+            "Imagine you are a traveler in ancient China. What sights and experiences would you have?",
+            "Write a letter from a time traveler visiting the year 3000 to a friend in the present day.",
+            "Describe the most beautiful place you've ever imagined, where nature and technology coexist in harmony.",
+            "Tell a story about an artist who discovers a magical paintbrush that brings their creations to life.",
+            "Imagine a city where people live in floating homes. Describe a day in the life of one of its residents.",
+            "Describe the feelings of the first astronaut to set foot on a newly discovered planet.",
+            "Write a tale about a library where each book transports the reader to the story’s world upon opening.",
+            "Imagine a world where humans communicate only through music. Describe a conversation.",
+            "Create a scene in a world where dreams can be recorded and shared. What does the most popular dream look like?",
+            "Describe a festival held by mythical creatures in an enchanted forest.",
+            "What would an ordinary school day look like in a school that teaches magic and science side by side?",
+            "Imagine you are an explorer in the lost city of Atlantis. What wonders do you encounter?",
+            "Write about a village where the trees can talk. What stories do they tell?",
+            "Picture a world where every animal can speak. Describe a conversation between two unlikely friends.",
+            "Describe a marketplace in a distant galaxy, filled with goods and creatures from across the universe.",
+            "Imagine you’ve just met a being who can control time. What advice do they give you?",
+            "Tell the story of a friendship between a human and an AI that has gained consciousness.",
+            "Write about a world where every person is born with a unique magical ability.",
+            "Describe a futuristic city where every building is grown rather than built.",
+            "Imagine an annual contest where inventors showcase their most imaginative creations. Describe the winning invention.",
+            "Tell a story of a hidden underwater kingdom discovered by deep-sea explorers.",
+            "Describe a museum in the future that showcases the extinct technologies of today.",
+            "Imagine an artist who paints landscapes that come to life. What’s their most famous work?",
+            "Write about a planet where the sun never sets. How do the inhabitants live?",
+            "Describe a world where humans live harmoniously with mythical creatures.",
+            "Imagine a time-traveling detective solving mysteries throughout history.",
+            "Describe a world where every building and vehicle is eco-friendly and alive.",
+            "Write about a magical forest where lost things from the human world appear.",
+            "Imagine you are a scientist studying alien plant life on a distant planet.",
+            "Describe a grand library that contains the knowledge of every civilization in the galaxy.",
+            "Tell a story about a music festival that takes place on the moon.",
+            "Imagine you’re a translator for the first alien language discovered on Earth. What do they want to tell us?",
+            "Write about a machine that can turn dreams into reality. What’s the first wish someone makes?",
+            "Describe a futuristic society where robots and humans are close friends.",
+            "Imagine a world where people can switch between animal and human form at will.",
+            "Tell a tale of a village that celebrates the arrival of each new season with a unique festival.",
+            "Describe an enchanted river where the water carries the memories of the past.",
+            "Write about an inventor who creates a device to communicate with plants.",
+            "Imagine a world where thoughts can be shared directly between minds.",
+            "Tell the story of a hidden valley where unicorns live undisturbed by humanity.",
+            "Write about a new language that everyone can speak, regardless of their origin.",
+            "Imagine a future city where transportation is entirely by flying cars and skybridges.",
+            "Describe a magical library where books adapt their story to match the reader’s desires.",
+            "Write about a castle in the clouds, only reachable by a hidden staircase.",
+            "Imagine you’ve discovered a portal to a parallel world. What’s the first thing you see?",
+            "Tell a story about a robot trying to understand human emotions.",
+            "Describe a world where people can control the elements, like fire and water.",
+            "Imagine a festival where all the inhabitants of Earth’s oceans gather once a year to celebrate."
+            '''
+        }
+        messages.append(user_message)
+        assistant_message = {
+            "role": assistant_role,
+            "content": example_content
+        }
+        messages.append(assistant_message)
+    
+    # Add the test sentence
+    user_message = {
+        "role": "user",
+        "content": f'''
+       "Once upon a time in a world without electricity...",
+        "Describe a day in the life of a lighthouse keeper on a remote island.",
+        "What do you think the future of transportation will look like in 50 years?",
+        "Imagine you are a traveler in ancient China. What sights and experiences would you have?",
+        "Write a letter from a time traveler visiting the year 3000 to a friend in the present day.",
+        "Describe the most beautiful place you've ever imagined, where nature and technology coexist in harmony.",
+        "Tell a story about an artist who discovers a magical paintbrush that brings their creations to life.",
+        "Imagine a city where people live in floating homes. Describe a day in the life of one of its residents.",
+        "Describe the feelings of the first astronaut to set foot on a newly discovered planet.",
+        "Write a tale about a library where each book transports the reader to the story’s world upon opening.",
+        "Imagine a world where humans communicate only through music. Describe a conversation.",
+        "Create a scene in a world where dreams can be recorded and shared. What does the most popular dream look like?",
+        "Describe a festival held by mythical creatures in an enchanted forest.",
+        "What would an ordinary school day look like in a school that teaches magic and science side by side?",
+        "Imagine you are an explorer in the lost city of Atlantis. What wonders do you encounter?",
+        "Write about a village where the trees can talk. What stories do they tell?",
+        "Picture a world where every animal can speak. Describe a conversation between two unlikely friends.",
+        "Describe a marketplace in a distant galaxy, filled with goods and creatures from across the universe.",
+        "Imagine you’ve just met a being who can control time. What advice do they give you?",
+        "Tell the story of a friendship between a human and an AI that has gained consciousness.",
+        "Write about a world where every person is born with a unique magical ability.",
+        "Describe a futuristic city where every building is grown rather than built.",
+        "Imagine an annual contest where inventors showcase their most imaginative creations. Describe the winning invention.",
+        "Tell a story of a hidden underwater kingdom discovered by deep-sea explorers.",
+        "Describe a museum in the future that showcases the extinct technologies of today.",
+        "Imagine an artist who paints landscapes that come to life. What’s their most famous work?",
+        "Write about a planet where the sun never sets. How do the inhabitants live?",
+        "Describe a world where humans live harmoniously with mythical creatures.",
+        "Imagine a time-traveling detective solving mysteries throughout history.",
+        "Describe a world where every building and vehicle is eco-friendly and alive.",
+        "Write about a magical forest where lost things from the human world appear.",
+        "Imagine you are a scientist studying alien plant life on a distant planet.",
+        "Describe a grand library that contains the knowledge of every civilization in the galaxy.",
+        "Tell a story about a music festival that takes place on the moon.",
+        "Imagine you’re a translator for the first alien language discovered on Earth. What do they want to tell us?",
+        "Write about a machine that can turn dreams into reality. What’s the first wish someone makes?",
+        "Describe a futuristic society where robots and humans are close friends.",
+        "Imagine a world where people can switch between animal and human form at will.",
+        "Tell a tale of a village that celebrates the arrival of each new season with a unique festival.",
+        "Describe an enchanted river where the water carries the memories of the past.",
+        "Write about an inventor who creates a device to communicate with plants.",
+        "Imagine a world where thoughts can be shared directly between minds.",
+        "Tell the story of a hidden valley where unicorns live undisturbed by humanity.",
+        "Write about a new language that everyone can speak, regardless of their origin.",
+        "Imagine a future city where transportation is entirely by flying cars and skybridges.",
+        "Describe a magical library where books adapt their story to match the reader’s desires.",
+        "Write about a castle in the clouds, only reachable by a hidden staircase.",
+        "Imagine you’ve discovered a portal to a parallel world. What’s the first thing you see?",
+        "Tell a story about a robot trying to understand human emotions.",
+        "Describe a world where people can control the elements, like fire and water.",
+        "Imagine a festival where all the inhabitants of Earth’s oceans gather once a year to celebrate."
+        '''
+    }
+    messages.append(user_message)
+    return messages
+
+# Process model output to align with token count
+def process_model_output(output, num_tokens):
+    pred_labels = output.strip().split()
+    if len(pred_labels) < num_tokens:
+        pred_labels.extend(['O'] * (num_tokens - len(pred_labels)))
+    elif len(pred_labels) > num_tokens:
+        pred_labels = pred_labels[:num_tokens]
+    return pred_labels
+
+# Convert numpy types to native Python types for JSON serialization
+def convert_numpy_types(obj):
+    if isinstance(obj, dict):
+        return {k: convert_numpy_types(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(v) for v in obj]
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    else:
+        return obj
+
 def evaluate_generation_metrics(hyps, refs):
     distinct_1_scores = []
     distinct_2_scores = []
