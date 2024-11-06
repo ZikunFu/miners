@@ -1,0 +1,17 @@
+Nawe, kwa hivyo, mchanga ulikuwa unajadili na maji na milima kuhusu mabadiliko yaliyotokea katika muda mrefu.
+
+Mchanga: "Maji, nimeona kwamba unapungua kwa wingi. Ni kwa nini?"
+
+Maji: "Mchanga, nimeona kwamba mchanga unapungua kwa wingi pia. Tunapungua kwa wingi kwa sababu mazingira yamebadilika. Binadamu wamekuwa wakifanya kazi zaidi na kuweka mazingira yao kwa njia ambayo inaweza kudhuru sisi wote."
+
+Milima: "Ninaona kwamba mchanga na maji ni wazi kuhusu mabadiliko yaliyotokea. Lakini nimeona kwamba mazingira yangu pia yamebadilika. Mabonde yangu yamepungua kwa wingi na mifumo yangu ya maji yamebadilika. Ni kwa nini?"
+
+Mchanga: "Milima, tunapungua kwa wingi kwa sababu mazingira yamebadilika. Binadamu wamekuwa wakifanya kazi zaidi na kuweka mazingira yao kwa njia ambayo inaweza kudhuru sisi wote."
+
+Maji: "Hata hivyo, milima, nimeona kwamba mabadiliko haya ni ya kawaida. Mazingira yamebadilika kila wakati. Ni lazima tujitahidi kujitawala na kujitawala kwa mabadiliko haya."
+
+Milima: "Ninakubali, maji. Tunahitaji kujitawala na kujitawala kwa mabadiliko haya. Lakini pia tunahitaji kujitahidi kujenga mazingira yetu na kuhifadhi mazingira yetu."
+
+Mchanga: "Ninakubali, milima. Tunahitaji kujitawala na kujitawala kwa mabadiliko haya. Lakini pia tunahitaji kujitahidi kujenga mazingira yetu na kuhifadhi mazingira yetu."
+
+Maji: "Ninakubali, mchanga. Tunahitaji kujitawala na kujitawala kwa mabadiliko haya. Lakini pia tunahitaji kujitahidi kujenga mazingira yetu na kuhifadhi mazingira

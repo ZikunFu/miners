@@ -1,0 +1,11 @@
+O,'s ann an làidir làidir a bha sinn a' cuideachadh ri chèile, an gaoithe, an t-sàile, is na beanntan. Tha sinn a' faicinn na h-òrain a tha a' dol thairis na linntean.
+
+Gaoithe: "O, t-sàile, ciamar a tha thu a' faicinn na h-òrain a tha a' dol thairis na linntean?"
+
+T-sàile: "O, gaoithe, tha mi a' faicinn na h-òrain a tha a' dol thairis na linntean, ach tha mi a' faicinn cuideachd na h-òrain a tha a' dol thairis na linntean a tha a' dol a dh'fhàgail. Tha na h-òrain a' dol a dh'fhàgail a' dol a dh'fhàgail na h-òrain a tha a' dol a thogail."
+
+Beanntan: "O, gaoithe, t-sàile, tha mi a' faicinn na h-òrain a tha a' dol thairis na linntean, ach tha mi a' faicinn cuideachd na h-òrain a tha a' dol thairis na linntean a tha a' dol a dh'fhàgail. Tha na h-òrain a' dol a dh'fhàgail a' dol a dh'fhàgail na h-òrain a tha a' dol a thogail, ach tha mi a' faicinn cuideachd na h-òrain a tha a' dol a dh'fhàgail na h-òrain a tha a' dol a thogail."
+
+Gaoithe: "O, beanntan, tha thu a' faicinn na h-òrain a tha a' dol thairis na linntean, ach tha mi a' faicinn cuideachd na h-òrain a tha a' dol thairis na linntean a tha a' dol a dh'fhàgail. Tha na h-òrain a' dol a dh'fhàgail a' dol a dh'fhàgail na h-òrain a tha a' dol a thogail, ach tha mi a' faicinn cuideachd na h-òrain a tha a' dol a dh'fhàgail na h-òrain a tha a' dol a thogail."
+
+T-sàile: "O, gaoithe, beanntan, tha mi a' faicinn na h-òrain a tha a' dol thair
