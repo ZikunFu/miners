@@ -63,8 +63,8 @@ def get_llama3_instruct_chat_response(gen_model, tokenizer, gen_model_checkpoint
     response = outputs[0][input_ids.shape[-1]:]
     response = tokenizer.decode(response, skip_special_tokens=True)
     if(verbose):
-        print("\n"+"="*35+"INPUT"+"="*35)
-        #print(inputs)
+        #print("\n"+"="*35+"INPUT"+"="*35)
+        #print(messages)
         print("="*35+"RESPONSE"+"="*43)
         print(response)
         print("="*70)
@@ -118,17 +118,19 @@ def retrieve_ids(train_embeddings, test_embeddings, train_labels, k, balance=Fal
         all_samples.append(all_indices)
     return all_samples
 
-def construct_prompt(few_shot_examples, test_tokens, model_checkpoint):
+def construct_prompt(few_shot_examples, test_tokens, gen_model_checkpoint):
     messages = []
     assistant_role = "assistant"
-    if model_checkpoint == "Meta-Llama-3.1-8B-Instruct":
+    if gen_model_checkpoint == "meta-llama/Meta-Llama-3.1-8B-Instruct":
         system_message = {
             "role": "system",
-            "content": "You are a helpful assistant that performs named entity recognition and output only labels."
+            "content": "You are an assistant that performs NER. Output only the label sequence (e.g., 'B-PER O O B-ORG I-ORG O'). Do not add explanations."
         }
         messages.append(system_message)
-    elif model_checkpoint == "google/gemma-2-9b-it":
+    elif gen_model_checkpoint == "google/gemma-2-9b-it":
         assistant_role = "model"
+    else:
+        raise ValueError("gen model checkpoint not supported in construct_prompt()")
     
     # Add few-shot examples
     for tokens, ner_tags in few_shot_examples:
@@ -199,7 +201,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model_checkpoint",
-        default="intfloat/multilingual-e5-base",
+        default="sentence-transformers/LaBSE",
         #choices=["sentence-transformers/LaBSE", "intfloat/multilingual-e5-base"],
         type=str,
         help="Path to pre-trained embedding model")
@@ -217,7 +219,7 @@ if __name__ == "__main__":
     parser.add_argument("--balance", action="store_true")
     parser.add_argument("--prompt", type=str, default="", help="Prompt")
     parser.add_argument("--instruction", type=str, default="", help="Instruction")
-    parser.add_argument("--k", type=int, default=2, help="Number of few-shot examples")
+    parser.add_argument("--k", type=int, default=0, help="Number of few-shot examples")
     args = parser.parse_args()
     
     print("###########################")
@@ -290,15 +292,16 @@ if __name__ == "__main__":
         # Prepare texts for embedding
         train_texts = [" ".join(tokens) for tokens in train_tokens]
         test_texts = [" ".join(tokens) for tokens in test_tokens]
+        
         # Compute embeddings
         print("Computing embeddings for training data...")
         train_embeddings = embedding_model.encode(train_texts, convert_to_numpy=True, show_progress_bar=True)
         print("Computing embeddings for test data...")
         test_embeddings = embedding_model.encode(test_texts, convert_to_numpy=True, show_progress_bar=True)
-
+        
         # Retrieve k-nearest neighbors
-        print("Retrieve "+str(args.k)+"-nearest neighbors...")
         if args.k > 0:
+            print("Retrieve "+str(args.k)+"-nearest neighbors...")
             all_few_shot_samples_ids = retrieve_ids(
                 train_embeddings, test_embeddings, train_tags, k=args.k
             )
@@ -322,7 +325,7 @@ if __name__ == "__main__":
             
             # Get model output
             hyp = get_llama3_instruct_chat_response(
-                gen_model, tokenizer, args.gen_model_checkpoint, messages, args.seed
+                gen_model, tokenizer, args.gen_model_checkpoint, messages, args.seed,verbose=False
             )
 
             pred_labels = process_model_output(hyp, num_tokens=len(test_token))
@@ -332,7 +335,7 @@ if __name__ == "__main__":
         report = classification_report(test_tags_bio, hyps,zero_division=0)
         report_dict = classification_report(test_tags_bio, hyps,zero_division=0,output_dict=True)
         report_dict = convert_numpy_types(report_dict)
-        print(f"Classification Report for {lang}:\n{report}")
+        #print(f"Classification Report for {lang}:\n{report}")
 
         # Save results
         if not os.path.exists(f"{output_dir}/{args.dataset}/{args.gen_model_checkpoint}/{args.model_checkpoint}/seed_{args.seed}/"):
