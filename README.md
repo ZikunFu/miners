@@ -1,12 +1,17 @@
 
-# MINERS Fork
+# Extending the MINERS Framework
 
-This fork was developed for Ontario Tech University's CSCI 6720 course project, focusing on bug fixes and improvements related to the OpenSub bitext Retrieval Dataset.
+This fork was developed for Ontario Tech University's CSCI 6720 group project, focusing on extending MINERS Framework's ICL classification and Deep Passage Retrieval tasks.
 
-**Roleplaying Seminar 1**  
-Implementer: Zikun Fu<br>
+**Group Members:**  
+- Alexie Linardatos(alexie.linardatos@ontariotechu.net)
+- Madhav Goyani(madhav.goyani@ontariotechu.net)
+- Zikun Fu(zikun.fu@ontariotechu.net)
+<br>
 
-A presentation on this project can be found here: [Link](https://docs.google.com/presentation/d/1U9qeot-BlmUkxxnJ2N1VWj7X7QgrHDynH_J-1ECgf_U/edit?usp=sharing)
+A video presentation on this project can be found here: [Link](https://drive.google.com/file/d/1lR5k7jcFGUvkAPnFsebAiF2d00Thnjgb/view?usp=sharing)
+
+The final report can be found here: [Link]()
 
 ## 🔧 Environment Setup
 
@@ -21,22 +26,21 @@ conda activate miners
 
 ## 📝 Experiment Logs
 
-Experiment logs (baseline and more) can be found in the Jupyter notebook provided [here](./logs.ipynb).
+Experiment logs can be found in `./logs` folder.
 
 ## 🚀 Running Experiments
 
-### Bitext Retrieval
-
-The main focus of this project is the bitext retrieval task using the OpenSub dataset.<br> 
-You can run experiments by following the commands in the Experiment logs notebook or the following command:
+### ICL Classification
 ```
-❱❱❱ python bitext.py --src_lang af --dataset opensub --seed 42 --cuda --model_checkpoint sentence-transformers/LaBSE
+❱❱❱ python icl_NER.py --dataset {dataset} --seed 42 --model_checkpoint {model} --gen_model_checkpoint {gen_model_checkpoint}  --cuda --load_in_8bit --k {k}
+❱❱❱ python icl_NER.py --dataset masakhaner --seed 42 --model_checkpoint sentence-transformers/LaBSE --gen_model_checkpoint meta-llama/Meta-Llama-3.1-8B-Instruct --cuda --load_in_8bit --k 2
 ```
 
 ## 📜 Credits
 
-- **OpenSub bitext mining dataset**: [Loïc Magne's OpenSubtitles Dataset](https://huggingface.co/datasets/loicmagne/open-subtitles-bitext-mining)
-- Original benchmark code based on the MINERS framework.<pre>
+- [**OpenSub bitext mining dataset**](https://huggingface.co/datasets/loicmagne/open-subtitles-bitext-mining)
+- [**Masakhaner NER dataset**](https://huggingface.co/datasets/masakhane/masakhaner2)
+- Framework code based on the **MINERS paper**:<pre>
 @article{winata2024miners,
   title={MINERS: Multilingual Language Models as Semantic Retrievers},
   author={Winata, Genta Indra and Zhang, Ruochen and Adelani, David Ifeoluwa},
