@@ -1,11 +1,244 @@
+# import os
+# import time  # Added for time estimation
+# import torch
+# import random
+# import numpy as np
+# import argparse
+# import json
+# import hashlib
+# from tqdm import tqdm  # Import tqdm for loading bars
+# from collections import Counter
+# from sentence_transformers import SentenceTransformer
+# from transformers import AutoTokenizer, AutoModelForCausalLM
+# from utils import XLSumDataset  # Updated to use XLSumDataset
+# from rouge_score import rouge_scorer
+# from bert_score import score as bert_score
+# from transformers.utils import logging
+# from datasets import load_dataset
+# from nltk.translate.meteor_score import meteor_score
+# from transformers import AutoModelForCausalLM, AutoTokenizer
+# import nltk
+# nltk.download('wordnet')
+
+# logging.set_verbosity_error()
+# os.environ["TRANSFORMERS_VERBOSITY"] = "error"
+
+# OPENAI_TOKEN = ""
+# COHERE_TOKEN = ""
+# HF_TOKEN = "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"
+
+# def argmax(array):
+#     """argmax with deterministic pseudorandom tie breaking."""
+#     max_indices = np.arange(len(array))[array == np.max(array)]
+#     idx = int(hashlib.sha256(np.asarray(array).tobytes()).hexdigest(), 16) % len(max_indices)
+#     return max_indices[idx]
+
+# def logsumexp(x):
+#     c = x.max()
+#     return c + np.log(np.sum(np.exp(x - c)))
+
+# def normalize(x):
+#     x = np.array(x)
+#     return np.exp(x - logsumexp(x))
+
+# def set_seed(seed):
+#     random.seed(seed)
+#     np.random.seed(seed)
+#     torch.manual_seed(seed)
+#     torch.cuda.manual_seed(seed)
+
+# def get_gemma_instruct_chat_response(gen_model, tokenizer, messages, verbose=True):
+#     # Extract the "content" field from each message
+#     input_texts = [msg["content"] for msg in messages]
+
+#     # Tokenize the extracted input texts
+#     input_ids = tokenizer(input_texts, return_tensors="pt", padding=True).input_ids.to(gen_model.device)
+
+#     outputs = gen_model.generate(
+#         input_ids,
+#         max_new_tokens=600,
+#         do_sample=True,
+#         temperature=0.2,
+#         top_p=1
+#     )
+#     response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+#     if verbose:
+#         print("\n" + "="*35 + "RESPONSE" + "="*43)
+#         print(response)
+#         print("="*70)
+#     return response
+
+#     response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+#     if verbose:
+#         print("\n" + "="*35 + "RESPONSE" + "="*43)
+#         print(response)
+#         print("="*70)
+#     return response
+
+# # Construct prompt for open-ended generation task across multiple languages
+# def construct_prompt(few_shot_examples, model_checkpoint, language):
+#     messages = []
+#     assistant_role = "model"
+    
+#     # System message with multilingual instruction
+#     if model_checkpoint == "google/gemma-2-9b-it":
+#         system_message = {
+#             "role": "system",
+#             "content": "You are a helpful assistant skilled in open-ended generation across multiple languages. "
+#                        "Please respond to each prompt in the appropriate language based on the language setting."
+#         }
+#         messages.append(system_message)
+    
+#     # Define open-ended prompts in the preferred format
+#     open_ended_prompts = [
+#         "Describe a festival in a mystical world where every season is celebrated uniquely.",
+#         "Imagine a future where humans can communicate with animals. Describe a conversation between two unlikely friends.",
+#         "What would a day in the life of an astronaut exploring a new galaxy look like?",
+#         "Tell the story of an inventor who creates a device to see the memories of any object they touch.",
+#         "Describe a city of the future where nature and technology exist in perfect harmony.",
+#     ]
+    
+#     # Create user prompts for each language
+#     for prompt in open_ended_prompts:
+#         user_message = {
+#             "role": "user",
+#             "content": f"Here is a prompt: {prompt}, please continue the story {language}"
+#         }
+#         messages.append(user_message)
+    
+#     return messages
+
+# def evaluate_generation_metrics(hyps, refs):
+#     distinct_1_scores = []
+#     distinct_2_scores = []
+#     rouge1_scores = []
+#     rouge2_scores = []
+#     rougeL_scores = []
+#     meteor_scores = []
+
+#     rouge = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
+#     for hyp, ref in zip(hyps, refs):
+#         rouge_scores = rouge.score(ref, hyp)
+#         rouge1_scores.append(rouge_scores['rouge1'].fmeasure)
+#         rouge2_scores.append(rouge_scores['rouge2'].fmeasure)
+#         rougeL_scores.append(rouge_scores['rougeL'].fmeasure)
+#         meteor_scores.append(meteor_score([ref.split()], hyp.split()))
+
+#         distinct_1 = len(set(zip(*[hyp.split()[i:] for i in range(1)]))) / len(hyp.split()) if len(hyp.split()) > 0 else 0
+#         distinct_2 = len(set(zip(*[hyp.split()[i:] for i in range(2)]))) / len(hyp.split()) if len(hyp.split()) > 1 else 0
+#         distinct_1_scores.append(distinct_1)
+#         distinct_2_scores.append(distinct_2)
+
+#     print("Calculating BERTScore...")
+#     P, R, F1 = bert_score(hyps, refs, lang='en', rescale_with_baseline=False)
+#     print("BERTScore calculated.")
+
+#     P, R, F1 = P.cpu().numpy().astype(float), R.cpu().numpy().astype(float), F1.cpu().numpy().astype(float)
+
+#     report_dict = {
+#         "ROUGE-1": float(np.mean(rouge1_scores)),
+#         "ROUGE-2": float(np.mean(rouge2_scores)),
+#         "ROUGE-L": float(np.mean(rougeL_scores)),
+#         "METEOR": float(np.mean(meteor_scores)),
+#         "BERTScore (P)": float(np.mean(P)),
+#         "BERTScore (R)": float(np.mean(R)),
+#         "BERTScore (F1)": float(np.mean(F1)),
+#         "Distinct-1": float(np.mean(distinct_1_scores)),
+#         "Distinct-2": float(np.mean(distinct_2_scores)),
+#         "Ensemble": float(np.mean([np.mean(rouge1_scores), np.mean(rouge2_scores), np.mean(rougeL_scores), np.mean(F1)]))
+#     }
+
+#     return report_dict
+
+# def evaluate_per_prompt_and_store(hyps, refs, prompt_id, language, metrics_dir):
+#     report = evaluate_generation_metrics(hyps, refs)
+#     language_dir = os.path.join(metrics_dir, language)
+#     if not os.path.exists(language_dir):
+#         os.makedirs(language_dir)
+#     metrics_file = os.path.join(language_dir, f"prompt_{prompt_id}_metrics.json")
+#     with open(metrics_file, "w", encoding="utf-8") as f:
+#         json.dump(report, f, indent=4)
+    
+#     print(f"Metrics for prompt {prompt_id} in {language} saved to {metrics_file}")
+#     return report
+
+# if __name__ == "__main__":
+
+#     if torch.cuda.is_available():
+#         print("CUDA is available!")
+#         print("Device Name:", torch.cuda.get_device_name(0))
+#         print("Total Memory (GB):", torch.cuda.get_device_properties(0).total_memory / 1e9)
+#     else:
+#         print("CUDA is not available.")
+
+#     parser = argparse.ArgumentParser()
+#     parser.add_argument("--model_checkpoint", default="sentence-transformers/LaBSE", type=str)
+#     parser.add_argument("--gen_model_checkpoint", default="google/gemma-2-9b-it", type=str)  # Changed to Gemma
+#     parser.add_argument("--dataset", type=str, default="xlsum")
+#     parser.add_argument("--seed", type=int, default=42)
+#     parser.add_argument("--cuda", action="store_true")
+#     args = parser.parse_args([])  # Adjusted for notebook execution
+
+#     set_seed(args.seed)
+#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+#     embedding_model = SentenceTransformer(args.model_checkpoint).to(device)
+    
+#     # Load the model in 8-bit precision
+#     gen_model = AutoModelForCausalLM.from_pretrained(
+#         "google/gemma-2-9b-it",
+#         load_in_8bit=True,
+#         device_map="auto",
+#         token=HF_TOKEN  # Updated to use `token` instead of `use_auth_token`
+#     )
+#     tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-9b-it")
+
+#     #gen_model = AutoModelForCausalLM.from_pretrained(args.gen_model_checkpoint, torch_dtype=torch.float16).to(device)  # Load Gemma with 16-bit
+#     #tokenizer = AutoTokenizer.from_pretrained(args.gen_model_checkpoint)
+
+#     output_dir = "generated_responses"
+#     metrics_dir = os.path.join(output_dir, "metrics")
+#     os.makedirs(output_dir, exist_ok=True)
+#     os.makedirs(metrics_dir, exist_ok=True)
+
+#     selected_languages = ["english", "french", "spanish", "german", "chinese_simplified", "arabic", "hindi", "swahili", "russian", "japanese"]
+#     all_metrics = []  
+#     start_time = time.time()
+#     dataset = XLSumDataset(sample_size=10)  # Adjust `sample_size` as needed
+
+#     for language in tqdm(selected_languages, desc="Processing Selected Languages", unit="language"):
+#         if language in dataset.train_data:
+#             messages = construct_prompt(few_shot_examples=[], model_checkpoint=args.gen_model_checkpoint, language=language)
+            
+#             for prompt_id, message in enumerate(tqdm(messages, desc=f"Processing Prompts in {language}", unit="prompt", leave=False)):
+#                 response = get_gemma_instruct_chat_response(gen_model, tokenizer, [message], verbose=False)
+#                 hyps = [response]
+#                 refs = ["Sample reference text"]
+                
+#                 prompt_metrics = evaluate_per_prompt_and_store(hyps, refs, prompt_id+1, language, metrics_dir)
+#                 all_metrics.append(prompt_metrics)
+
+#                 elapsed_time = time.time() - start_time
+#                 est_time_left = (len(messages) * len(selected_languages) - prompt_id) * (elapsed_time / (prompt_id + 1))
+#                 print(f"Estimated Time Remaining: {est_time_left:.2f} seconds", end='\r')
+
+#     with open(os.path.join(metrics_dir, "multilingual_evaluation_report.json"), "w", encoding="utf-8") as f:
+#         json.dump(all_metrics, f, indent=4)
+#     total_time = time.time() - start_time
+#     print(f"\nAll responses generated and saved successfully in {total_time:.2f} seconds.")
+
+
+
+
 import os
+import time  # Added for time estimation
 import torch
 import random
 import numpy as np
 import argparse
 import json
 import hashlib
-from tqdm import tqdm
+from tqdm import tqdm  # Import tqdm for loading bars
 from collections import Counter
 from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -13,6 +246,13 @@ from utils import XLSumDataset  # Updated to use XLSumDataset
 from rouge_score import rouge_scorer
 from bert_score import score as bert_score
 from transformers.utils import logging
+from datasets import load_dataset
+from nltk.translate.meteor_score import meteor_score
+from transformers import GPT2Tokenizer, GPT2LMHeadModel
+from nltk.translate.bleu_score import sentence_bleu
+import matplotlib.pyplot as plt  # For plotting F1 scores
+import nltk
+nltk.download('wordnet')
 
 logging.set_verbosity_error()
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
@@ -55,7 +295,7 @@ def get_llama3_instruct_chat_response(gen_model, tokenizer, messages, verbose=Tr
 
     outputs = gen_model.generate(
         input_ids,
-        max_new_tokens=64,  
+        max_new_tokens=600,  
         eos_token_id=terminators,
         do_sample=True,
         temperature=0.2,
@@ -72,143 +312,45 @@ def get_llama3_instruct_chat_response(gen_model, tokenizer, messages, verbose=Tr
         print("="*70)
     return response
 
-# Construct prompt for open-ended generation task
-def construct_prompt(few_shot_examples, test_tokens, model_checkpoint):
+# Construct prompt for open-ended generation task across multiple languages
+def construct_prompt(few_shot_examples, model_checkpoint, language):
     messages = []
     assistant_role = "assistant"
+    
+    # System message with multilingual instruction
     if model_checkpoint == "Meta-Llama-3.1-8B-Instruct":
         system_message = {
             "role": "system",
-            "content": "You are a helpful assistant that performs open-ended generation and outputs completed prompts in multiple languages." 
-            "The languages are amharic, arabic, azerbaijani, bengali, burmese, chinese_simplified, chinese_traditional, english, french, gujarati, hausa, hindi, igbo, indonesian, japanese, kirundi, korean, kyrgyz, marathi, nepali, oromo, pashto, persian, pidgin, portuguese, punjabi, russian, scottish_gaelic, serbian_cyrillic, serbian_latin, sinhala, somali, spanish, swahili, tamil, telugu, thai, tigrinya, turkish, ukrainian, urdu, uzbek, vietnamese, welsh, yoruba"
+            "content": "You are a helpful assistant skilled in open-ended generation across multiple languages. "
+                       "Please respond to each prompt in the appropriate language based on the language setting. "
+                       "The languages supported are amharic, arabic, azerbaijani, bengali, burmese, "
+                       "chinese_simplified, chinese_traditional, english, french, gujarati, hausa, hindi, "
+                       "igbo, indonesian, japanese, kirundi, korean, kyrgyz, marathi, nepali, oromo, pashto, persian, "
+                       "pidgin, portuguese, punjabi, russian, scottish_gaelic, serbian_cyrillic, serbian_latin, "
+                       "sinhala, somali, spanish, swahili, tamil, telugu, thai, tigrinya, turkish, ukrainian, urdu, "
+                       "uzbek, vietnamese, welsh, yoruba."
         }
         messages.append(system_message)
     elif model_checkpoint == "google/gemma-2-9b-it":
         assistant_role = "model"
     
-    # Add few-shot examples
-    for tokens, example_content in few_shot_examples:
+    # Define open-ended prompts in the preferred format
+    open_ended_prompts = [
+        "Describe a festival in a mystical world where every season is celebrated uniquely.",
+        "Imagine a future where humans can communicate with animals. Describe a conversation between two unlikely friends.",
+        "What would a day in the life of an astronaut exploring a new galaxy look like?",
+        "Tell the story of an inventor who creates a device to see the memories of any object they touch.",
+        "Describe a city of the future where nature and technology exist in perfect harmony.",
+    ]
+    
+    # Create user prompts for each language and the 50 provided prompts
+    for prompt in open_ended_prompts:
         user_message = {
             "role": "user",
-            "content": f'''
-        "Once upon a time in a world without electricity...",
-            "Describe a day in the life of a lighthouse keeper on a remote island.",
-            "What do you think the future of transportation will look like in 50 years?",
-            "Imagine you are a traveler in ancient China. What sights and experiences would you have?",
-            "Write a letter from a time traveler visiting the year 3000 to a friend in the present day.",
-            "Describe the most beautiful place you've ever imagined, where nature and technology coexist in harmony.",
-            "Tell a story about an artist who discovers a magical paintbrush that brings their creations to life.",
-            "Imagine a city where people live in floating homes. Describe a day in the life of one of its residents.",
-            "Describe the feelings of the first astronaut to set foot on a newly discovered planet.",
-            "Write a tale about a library where each book transports the reader to the story’s world upon opening.",
-            "Imagine a world where humans communicate only through music. Describe a conversation.",
-            "Create a scene in a world where dreams can be recorded and shared. What does the most popular dream look like?",
-            "Describe a festival held by mythical creatures in an enchanted forest.",
-            "What would an ordinary school day look like in a school that teaches magic and science side by side?",
-            "Imagine you are an explorer in the lost city of Atlantis. What wonders do you encounter?",
-            "Write about a village where the trees can talk. What stories do they tell?",
-            "Picture a world where every animal can speak. Describe a conversation between two unlikely friends.",
-            "Describe a marketplace in a distant galaxy, filled with goods and creatures from across the universe.",
-            "Imagine you’ve just met a being who can control time. What advice do they give you?",
-            "Tell the story of a friendship between a human and an AI that has gained consciousness.",
-            "Write about a world where every person is born with a unique magical ability.",
-            "Describe a futuristic city where every building is grown rather than built.",
-            "Imagine an annual contest where inventors showcase their most imaginative creations. Describe the winning invention.",
-            "Tell a story of a hidden underwater kingdom discovered by deep-sea explorers.",
-            "Describe a museum in the future that showcases the extinct technologies of today.",
-            "Imagine an artist who paints landscapes that come to life. What’s their most famous work?",
-            "Write about a planet where the sun never sets. How do the inhabitants live?",
-            "Describe a world where humans live harmoniously with mythical creatures.",
-            "Imagine a time-traveling detective solving mysteries throughout history.",
-            "Describe a world where every building and vehicle is eco-friendly and alive.",
-            "Write about a magical forest where lost things from the human world appear.",
-            "Imagine you are a scientist studying alien plant life on a distant planet.",
-            "Describe a grand library that contains the knowledge of every civilization in the galaxy.",
-            "Tell a story about a music festival that takes place on the moon.",
-            "Imagine you’re a translator for the first alien language discovered on Earth. What do they want to tell us?",
-            "Write about a machine that can turn dreams into reality. What’s the first wish someone makes?",
-            "Describe a futuristic society where robots and humans are close friends.",
-            "Imagine a world where people can switch between animal and human form at will.",
-            "Tell a tale of a village that celebrates the arrival of each new season with a unique festival.",
-            "Describe an enchanted river where the water carries the memories of the past.",
-            "Write about an inventor who creates a device to communicate with plants.",
-            "Imagine a world where thoughts can be shared directly between minds.",
-            "Tell the story of a hidden valley where unicorns live undisturbed by humanity.",
-            "Write about a new language that everyone can speak, regardless of their origin.",
-            "Imagine a future city where transportation is entirely by flying cars and skybridges.",
-            "Describe a magical library where books adapt their story to match the reader’s desires.",
-            "Write about a castle in the clouds, only reachable by a hidden staircase.",
-            "Imagine you’ve discovered a portal to a parallel world. What’s the first thing you see?",
-            "Tell a story about a robot trying to understand human emotions.",
-            "Describe a world where people can control the elements, like fire and water.",
-            "Imagine a festival where all the inhabitants of Earth’s oceans gather once a year to celebrate."
-            '''
+            "content": f"Here is a prompt: {prompt}, please continue the story {language}"
         }
         messages.append(user_message)
-        assistant_message = {
-            "role": assistant_role,
-            "content": example_content
-        }
-        messages.append(assistant_message)
     
-    # Add the test sentence
-    user_message = {
-        "role": "user",
-        "content": f'''
-       "Once upon a time in a world without electricity...",
-        "Describe a day in the life of a lighthouse keeper on a remote island.",
-        "What do you think the future of transportation will look like in 50 years?",
-        "Imagine you are a traveler in ancient China. What sights and experiences would you have?",
-        "Write a letter from a time traveler visiting the year 3000 to a friend in the present day.",
-        "Describe the most beautiful place you've ever imagined, where nature and technology coexist in harmony.",
-        "Tell a story about an artist who discovers a magical paintbrush that brings their creations to life.",
-        "Imagine a city where people live in floating homes. Describe a day in the life of one of its residents.",
-        "Describe the feelings of the first astronaut to set foot on a newly discovered planet.",
-        "Write a tale about a library where each book transports the reader to the story’s world upon opening.",
-        "Imagine a world where humans communicate only through music. Describe a conversation.",
-        "Create a scene in a world where dreams can be recorded and shared. What does the most popular dream look like?",
-        "Describe a festival held by mythical creatures in an enchanted forest.",
-        "What would an ordinary school day look like in a school that teaches magic and science side by side?",
-        "Imagine you are an explorer in the lost city of Atlantis. What wonders do you encounter?",
-        "Write about a village where the trees can talk. What stories do they tell?",
-        "Picture a world where every animal can speak. Describe a conversation between two unlikely friends.",
-        "Describe a marketplace in a distant galaxy, filled with goods and creatures from across the universe.",
-        "Imagine you’ve just met a being who can control time. What advice do they give you?",
-        "Tell the story of a friendship between a human and an AI that has gained consciousness.",
-        "Write about a world where every person is born with a unique magical ability.",
-        "Describe a futuristic city where every building is grown rather than built.",
-        "Imagine an annual contest where inventors showcase their most imaginative creations. Describe the winning invention.",
-        "Tell a story of a hidden underwater kingdom discovered by deep-sea explorers.",
-        "Describe a museum in the future that showcases the extinct technologies of today.",
-        "Imagine an artist who paints landscapes that come to life. What’s their most famous work?",
-        "Write about a planet where the sun never sets. How do the inhabitants live?",
-        "Describe a world where humans live harmoniously with mythical creatures.",
-        "Imagine a time-traveling detective solving mysteries throughout history.",
-        "Describe a world where every building and vehicle is eco-friendly and alive.",
-        "Write about a magical forest where lost things from the human world appear.",
-        "Imagine you are a scientist studying alien plant life on a distant planet.",
-        "Describe a grand library that contains the knowledge of every civilization in the galaxy.",
-        "Tell a story about a music festival that takes place on the moon.",
-        "Imagine you’re a translator for the first alien language discovered on Earth. What do they want to tell us?",
-        "Write about a machine that can turn dreams into reality. What’s the first wish someone makes?",
-        "Describe a futuristic society where robots and humans are close friends.",
-        "Imagine a world where people can switch between animal and human form at will.",
-        "Tell a tale of a village that celebrates the arrival of each new season with a unique festival.",
-        "Describe an enchanted river where the water carries the memories of the past.",
-        "Write about an inventor who creates a device to communicate with plants.",
-        "Imagine a world where thoughts can be shared directly between minds.",
-        "Tell the story of a hidden valley where unicorns live undisturbed by humanity.",
-        "Write about a new language that everyone can speak, regardless of their origin.",
-        "Imagine a future city where transportation is entirely by flying cars and skybridges.",
-        "Describe a magical library where books adapt their story to match the reader’s desires.",
-        "Write about a castle in the clouds, only reachable by a hidden staircase.",
-        "Imagine you’ve discovered a portal to a parallel world. What’s the first thing you see?",
-        "Tell a story about a robot trying to understand human emotions.",
-        "Describe a world where people can control the elements, like fire and water.",
-        "Imagine a festival where all the inhabitants of Earth’s oceans gather once a year to celebrate."
-        '''
-    }
-    messages.append(user_message)
     return messages
 
 # Process model output to align with token count
@@ -239,35 +381,32 @@ def evaluate_generation_metrics(hyps, refs):
     rouge1_scores = []
     rouge2_scores = []
     rougeL_scores = []
+    meteor_scores = []
 
-    # Initialize ROUGE scorer
     rouge = rouge_scorer.RougeScorer(['rouge1', 'rouge2', 'rougeL'], use_stemmer=True)
-
-    # Calculate ROUGE and Distinct metrics
     for hyp, ref in zip(hyps, refs):
         rouge_scores = rouge.score(ref, hyp)
         rouge1_scores.append(rouge_scores['rouge1'].fmeasure)
         rouge2_scores.append(rouge_scores['rouge2'].fmeasure)
         rougeL_scores.append(rouge_scores['rougeL'].fmeasure)
+        meteor_scores.append(meteor_score([ref.split()], hyp.split()))
 
-        distinct_1 = len(set(zip(*[hyp[i:] for i in range(1)]))) / len(hyp.split()) if len(hyp.split()) > 0 else 0
-        distinct_2 = len(set(zip(*[hyp[i:] for i in range(2)]))) / len(hyp.split()) if len(hyp.split()) > 1 else 0
+        distinct_1 = len(set(zip(*[hyp.split()[i:] for i in range(1)]))) / len(hyp.split()) if len(hyp.split()) > 0 else 0
+        distinct_2 = len(set(zip(*[hyp.split()[i:] for i in range(2)]))) / len(hyp.split()) if len(hyp.split()) > 1 else 0
         distinct_1_scores.append(distinct_1)
         distinct_2_scores.append(distinct_2)
 
-    # Calculate BERTScore
     print("Calculating BERTScore...")
     P, R, F1 = bert_score(hyps, refs, lang='en', rescale_with_baseline=False)
     print("BERTScore calculated.")
 
-    # Convert tensors to Python floats
     P, R, F1 = P.cpu().numpy().astype(float), R.cpu().numpy().astype(float), F1.cpu().numpy().astype(float)
 
-    # Organize report dictionary
     report_dict = {
         "ROUGE-1": float(np.mean(rouge1_scores)),
         "ROUGE-2": float(np.mean(rouge2_scores)),
         "ROUGE-L": float(np.mean(rougeL_scores)),
+        "METEOR": float(np.mean(meteor_scores)),
         "BERTScore (P)": float(np.mean(P)),
         "BERTScore (R)": float(np.mean(R)),
         "BERTScore (F1)": float(np.mean(F1)),
@@ -278,51 +417,80 @@ def evaluate_generation_metrics(hyps, refs):
 
     return report_dict
 
-# Main function setup
+def evaluate_per_prompt_and_store(hyps, refs, prompt_id, language, metrics_dir):
+    report = evaluate_generation_metrics(hyps, refs)
+    language_dir = os.path.join(metrics_dir, language)
+    if not os.path.exists(language_dir):
+        os.makedirs(language_dir)
+    metrics_file = os.path.join(language_dir, f"prompt_{prompt_id}_metrics.json")
+    with open(metrics_file, "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=4)
+    
+    print(f"Metrics for prompt {prompt_id} in {language} saved to {metrics_file}")
+    return report
+
 if __name__ == "__main__":
+
+    if torch.cuda.is_available():
+        print("CUDA is available!")
+        print("Device Name:", torch.cuda.get_device_name(0))
+        print("Total Memory (GB):", torch.cuda.get_device_properties(0).total_memory / 1e9)
+    else:
+        print("CUDA is not available.")
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_checkpoint", default="sentence-transformers/LaBSE", type=str, help="Path to embedding model")
-    parser.add_argument("--gen_model_checkpoint", default="meta-llama/Meta-Llama-3.1-8B-Instruct", type=str, help="Generation model")
-    parser.add_argument("--dataset", type=str, default="xlsum", help="Dataset name")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed for initialization")
-    parser.add_argument("--cuda", action="store_true", help="Use CUDA when available")
-    parser.add_argument("--sample_size", type=int, default=5, help="Limit the dataset sample size")
+    parser.add_argument("--model_checkpoint", default="sentence-transformers/LaBSE", type=str)
+    parser.add_argument("--gen_model_checkpoint", default="meta-llama/Meta-Llama-3.1-8B-Instruct", type=str)
+    parser.add_argument("--dataset", type=str, default="xlsum")
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--cuda", action="store_true")
     args = parser.parse_args([])  # Adjusted for notebook execution
 
-    # Set random seed for reproducibility
     set_seed(args.seed)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Load embedding and generation models
-    embedding_model = SentenceTransformer(args.model_checkpoint).cuda() if args.cuda else SentenceTransformer(args.model_checkpoint)
-    gen_model = AutoModelForCausalLM.from_pretrained(args.gen_model_checkpoint).cuda() if args.cuda else AutoModelForCausalLM.from_pretrained(args.gen_model_checkpoint)
+    embedding_model = SentenceTransformer(args.model_checkpoint).to(device)
+    gen_model = AutoModelForCausalLM.from_pretrained(args.gen_model_checkpoint, torch_dtype=torch.float16).to(device)
     tokenizer = AutoTokenizer.from_pretrained(args.gen_model_checkpoint)
 
-    # Load the XLSum dataset
-    dataset = XLSumDataset(sample_size=args.sample_size)
+    output_dir = "generated_responses"
+    metrics_dir = os.path.join(output_dir, "metrics")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    if not os.path.exists(metrics_dir):
+        os.makedirs(metrics_dir)
 
-    # Choose the correct language key and get sample data
-    lang = "english"  # Adjusted to match available keys in XLSum
-    if lang in dataset.train_data:
-        train_texts = dataset.train_data[lang]["source"]
-        train_summaries = dataset.train_data[lang]["target"]
+    selected_languages = ["english", "french", "spanish", "german", "chinese_simplified"]
+    sample_sizes = [2, 5, 10, 15, 20]  # Sample sizes to test
+    f1_scores = {n: [] for n in sample_sizes}
 
-        # Evaluate and display metrics for a sample
-        hyps = train_texts[:10]
-        refs = train_summaries[:10]
+    start_time = time.time()
 
-        # Calculate and display metrics
-        print("Evaluating generation metrics...")
-        report = evaluate_generation_metrics(hyps, refs)
-        print("Evaluation Report:")
-        print(json.dumps(report, indent=4))
+    for n in sample_sizes:
+        print(f"\nEvaluating for sample size n = {n}")
+        dataset = XLSumDataset(sample_size=n)
 
-        # Save report to JSON file
-        output_dir = "logs/save_xlsum"
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        output_path = os.path.join(output_dir, "evaluation_report.json")
-        with open(output_path, "w") as outfile:
-            json.dump(report, outfile, indent=4)
-        print(f"Report saved successfully to {output_path}")
-    else:
-        print(f"Language '{lang}' not found in the dataset.")
+        for language in tqdm(selected_languages, desc="Processing Selected Languages", unit="language"):
+            if language in dataset.train_data:
+                messages = construct_prompt(few_shot_examples=[], model_checkpoint=args.gen_model_checkpoint, language=language)
+                
+                f1_scores_for_n = []
+                for prompt_id, message in enumerate(tqdm(messages, desc=f"Processing Prompts in {language}", unit="prompt", leave=False)):
+                    response = get_llama3_instruct_chat_response(gen_model, tokenizer, [message], verbose=False)
+                    hyps = [response]
+                    refs = ["Sample reference text"]
+                    
+                    prompt_metrics = evaluate_per_prompt_and_store(hyps, refs, prompt_id+1, language, metrics_dir)
+                    f1_scores_for_n.append(prompt_metrics["BERTScore (F1)"])
+
+                f1_scores[n].append(np.mean(f1_scores_for_n))
+
+    avg_f1_scores = {n: np.mean(scores) for n, scores in f1_scores.items()}
+    plt.plot(list(avg_f1_scores.keys()), list(avg_f1_scores.values()), marker='o')
+    plt.xlabel("Sample Size (n)")
+    plt.ylabel("Average F1 Score")
+    plt.title("F1 Score vs Sample Size")
+    plt.show()
+
+    total_time = time.time() - start_time
+    print(f"\nAll responses generated and saved successfully in {total_time:.2f} seconds.")
