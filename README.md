@@ -1,10 +1,13 @@
 
 # Extending the MINERS Framework
 
-This fork was developed for Ontario Tech University's CSCI 6720 group project, focusing on extending [MINERS Framework](https://github.com/gentaiscool/miners)'s ICL classification and Deep Passage Retrieval tasks.
+This fork was developed for Ontario Tech University's CSCI 6720 Group Project, focusing on extending [MINERS Framework](https://github.com/gentaiscool/miners)'s ICL classification and Deep Passage Retrieval tasks.
 
 <p align="center">
   <img src="assets/pipeline_extended.png" width="75%" height="75%">
+</p>
+<p align="center">
+  <img src="assets/DPR.png" width="75%" height="75%">
 </p>
 
 **Group Members:**  
