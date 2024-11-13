@@ -36,6 +36,11 @@ Full Experiment logs can be accessed [here](https://drive.google.com/drive/folde
 ❱❱❱ python icl_NER.py --dataset masakhaner --seed 42 --model_checkpoint sentence-transformers/LaBSE --gen_model_checkpoint meta-llama/Meta-Llama-3.1-8B-Instruct --cuda --load_in_8bit --k 2
 ```
 
+### Dense Passage Retrieval
+```
+
+```
+
 ## 💻 Models Support
 All models used for the experiments are listed below:
 ### Encoder LMs and APIs
@@ -52,6 +57,7 @@ All models used for the experiments are listed below:
 
 - [**OpenSub bitext mining dataset**](https://huggingface.co/datasets/loicmagne/open-subtitles-bitext-mining)
 - [**Masakhaner NER dataset**](https://huggingface.co/datasets/masakhane/masakhaner2)
+- [**MIRACL dataset**](https://project-miracl.github.io/)
 - Framework code based on the **MINERS paper**:<pre>
 @article{winata2024miners,
   title={MINERS: Multilingual Language Models as Semantic Retrievers},
