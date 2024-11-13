@@ -18,7 +18,7 @@ This fork was developed for Ontario Tech University's CSCI 6720 Group Project, f
 
 A 3 minute video summary on this project can be found here: [Link](https://drive.google.com/file/d/1lR5k7jcFGUvkAPnFsebAiF2d00Thnjgb/view?usp=sharing)
 
-The final report can be found here: [Link](https://drive.google.com/file/d/1mjhEwm8LyxogA2uZfqkTQEoyRKEsTyKW/view?usp=sharing)
+The final report can be found here: [Link](https://drive.google.com/file/d/1eyugfNSQSDfseyGCI3tDeXJ4Tub5_M0B/view?usp=drive_link)
 
 ## 🔧 Environment Setup
 ```bash
