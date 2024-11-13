@@ -1,7 +1,11 @@
 
 # Extending the MINERS Framework
 
-This fork was developed for Ontario Tech University's CSCI 6720 group project, focusing on extending MINERS Framework's ICL classification and Deep Passage Retrieval tasks.
+This fork was developed for Ontario Tech University's CSCI 6720 group project, focusing on extending [MINERS Framework](https://github.com/gentaiscool/miners)'s ICL classification and Deep Passage Retrieval tasks.
+
+<p align="center">
+  <img src="assets/pipeline_extended.png" width="75%" height="75%">
+</p>
 
 **Group Members:**  
 - Alexie Linardatos(alexie.linardatos@ontariotechu.net)
@@ -22,7 +26,7 @@ pip install -r requirements.txt
 
 ## 📝 Experiment Logs
 
-Experiment logs can be found in `./logs` folder.
+Full Experiment logs can be accessed [here](https://drive.google.com/drive/folders/1XtJHbjoHxtYN0Cia0dGCSWMhc3xj84IA?usp=drive_link).
 
 ## 🚀 Running Experiments
 
