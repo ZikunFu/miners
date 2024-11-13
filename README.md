@@ -37,9 +37,21 @@ Full Experiment logs can be accessed [here](https://drive.google.com/drive/folde
 ```
 
 ### Dense Passage Retrieval
+Download the corpus:
+```
+!wget https://huggingface.co/datasets/miracl/miracl-corpus/resolve/main/miracl-corpus-v1.0-bn/docs-0.jsonl.gz
+```
+Chunk and Encode the downloaded corpus:
+```
+python chunk_dataset.py
+bash encode_corpus.sh
 ```
 
+Run the evaluation:
 ```
+bash search_eval.sh
+```
+
 
 ## 💻 Models Support
 All models used for the experiments are listed below:
