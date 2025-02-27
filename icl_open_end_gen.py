@@ -14,13 +14,22 @@ from rouge_score import rouge_scorer
 from bert_score import score as bert_score
 from transformers.utils import logging
 from nltk.translate.meteor_score import meteor_score
+from datasets import load_dataset
 import nltk
 nltk.download('wordnet')
 
 logging.set_verbosity_error()
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 
-HF_TOKEN = "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"
+# Define different Hugging Face tokens for Gemma and Llama
+HF_TOKEN_LLAMA = "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"
+HF_TOKEN_GEMMA = "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"
+
+# Determine which model to use
+MODEL_TYPE = os.environ.get("MODEL_TYPE", "Llama")  # Default to Llama if not specified
+GEN_MODEL_CHECKPOINT = "meta-llama/Llama-3.1-8B-Instruct" if "Llama" in MODEL_TYPE else "google/gemma-2-9b-it"
+HF_TOKEN = HF_TOKEN_LLAMA if "Llama" in MODEL_TYPE else HF_TOKEN_GEMMA
+
 
 def set_seed(seed):
     random.seed(seed)
@@ -28,8 +37,7 @@ def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
 
-def get_gemma_chat_response(gen_model, tokenizer, messages, verbose=True):
-    # Extract only the content field from each message dictionary for tokenization
+def get_model_response(gen_model, tokenizer, messages, verbose=True):
     text_inputs = [msg['content'] for msg in messages]
 
     input_ids = tokenizer(text_inputs, return_tensors="pt", padding=True).input_ids.to(gen_model.device)
@@ -45,10 +53,18 @@ def get_gemma_chat_response(gen_model, tokenizer, messages, verbose=True):
     return response
 
 
+
 def construct_prompt(few_shot_examples, model_checkpoint, language):
     messages = []
 
-    if model_checkpoint == "google/gemma-2-9b-it":
+    if "Llama" in model_checkpoint:
+        system_message = {
+            "role": "system",
+            "content": "You are a multilingual assistant skilled in generating coherent open-ended responses."
+        }
+        messages.append(system_message)
+    
+    elif "gemma" in model_checkpoint:
         system_message = {
             "role": "system",
             "content": "You are a helpful assistant skilled in open-ended generation across multiple languages. "
@@ -56,6 +72,11 @@ def construct_prompt(few_shot_examples, model_checkpoint, language):
         }
         messages.append(system_message)
 
+    # Use few-shot examples in prompt
+    for example in few_shot_examples:
+        messages.append({"role": "user", "content": f"Example: {example['source']} → {example['target']}"})
+
+    # Add actual open-ended prompts
     open_ended_prompts = [
         "Describe a festival in a mystical world where every season is celebrated uniquely.",
         "Imagine a future where humans can communicate with animals. Describe a conversation between two unlikely friends.",
@@ -67,11 +88,13 @@ def construct_prompt(few_shot_examples, model_checkpoint, language):
     for prompt in open_ended_prompts:
         user_message = {
             "role": "user",
-            "content": f"Here is a prompt: {prompt}, please continue the story {language}"
+            "content": f"Here is a prompt: {prompt}, please continue the story in {language}."
         }
         messages.append(user_message)
 
     return messages
+
+
 
 def get_reference_texts():
     return [
@@ -133,23 +156,35 @@ if __name__ == "__main__":
         print("CUDA is not available.")
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_checkpoint", default="sentence-transformers/LaBSE", type=str)
-    parser.add_argument("--gen_model_checkpoint", default="google/gemma-2-9b-it", type=str)
-    parser.add_argument("--dataset", type=str, default="xlsum")
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--cuda", action="store_true")
+    parser.add_argument("--embedding_model", default="labse", choices=["labse", "e5"], type=str)
+    parser.add_argument("--gen_model_checkpoint", default="google/gemma-2-9b-it", type=str, help="Checkpoint for the generation model.")
+    parser.add_argument("--dataset", type=str, default="xlsum", help="Dataset name to use.")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility.")
+    parser.add_argument("--cuda", action="store_true", help="Enable CUDA if available.")
+
     args = parser.parse_args([])  # Adjusted for notebook execution
+
 
     set_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    embedding_model = SentenceTransformer(args.model_checkpoint).to(device)
+    # Load embedding model based on user choice
+    if args.embedding_model == "labse":
+        embedding_model = SentenceTransformer("sentence-transformers/LaBSE").to(device)
+    elif args.embedding_model == "e5":
+        embedding_model = SentenceTransformer("intfloat/e5-large").to(device)  # Change to "e5-base" if needed
+        
+    # Load generation model (Gemma or Llama)
     gen_model = AutoModelForCausalLM.from_pretrained(
-        args.gen_model_checkpoint,
-        token=HF_TOKEN,
-        torch_dtype=torch.float16
+    args.gen_model_checkpoint,
+    token=HF_TOKEN,
+    torch_dtype=torch.float16
     ).to(device)
-    tokenizer = AutoTokenizer.from_pretrained(args.gen_model_checkpoint, token=HF_TOKEN)
+
+
+    tokenizer = AutoTokenizer.from_pretrained(GEN_MODEL_CHECKPOINT, token=HF_TOKEN)
+
+
 
     output_dir = "generated_responses"
     metrics_dir = os.path.join(output_dir, "metrics")
@@ -165,20 +200,27 @@ if __name__ == "__main__":
     start_time = time.time()
     reference_texts = get_reference_texts()
 
-    for k in [2, 10]:  # Few-shot examples loop
+    for k in [0,2, 5,10]:  # Few-shot examples loop
         for language in tqdm(selected_languages, desc="Processing Selected Languages", unit="language"):
             if language in dataset.train_data:
-                messages = construct_prompt(few_shot_examples=[], model_checkpoint=args.gen_model_checkpoint, language=language)
+                # Select k examples for few-shot learning
+                few_shot_examples = [
+                    {"source": src, "target": tgt}
+                    for src, tgt in zip(dataset.train_data[language]["source"][:k], 
+                                        dataset.train_data[language]["target"][:k])
+                ]
+                
+                messages = construct_prompt(few_shot_examples, model_checkpoint=args.gen_model_checkpoint, language=language)
                 language_output = []
 
                 for prompt_id, (message, ref) in enumerate(zip(messages, reference_texts), start=1):
-                    response = get_gemma_chat_response(gen_model, tokenizer, [message], verbose=False)
+                    response = get_model_response(gen_model, tokenizer, [message], verbose=False)
                     hyps = [response]
                     refs = [ref]
-                    
-                    # Save individual prompt and response for each language in a text format
-                    language_output.append(f"Prompt Number: {prompt_id}\nPrompt: {message['content']}\nResponse: {response}\n")
 
+                    # Append each prompt-response pair to language_output
+                    language_output.append(f"Prompt Number: {prompt_id}\nPrompt: {message['content']}\nResponse: {response}\n")
+                    
                     # Evaluate and collect metrics
                     prompt_metrics = evaluate_generation_metrics(hyps, refs)
                     prompt_metrics["Prompt Number"] = prompt_id
@@ -190,9 +232,8 @@ if __name__ == "__main__":
                     est_time_left = (len(messages) * len(selected_languages) - prompt_id) * (elapsed_time / (prompt_id + 1))
                     print(f"Estimated Time Remaining: {est_time_left:.2f} seconds", end='\r')
 
-                # Save all prompts and responses for each language to a text file
                 language_file = os.path.join(output_dir, f"{language}_prompts_k{k}.txt")
-                with open(language_file, "w", encoding="utf-8") as f:
+                with open(language_file, "a", encoding="utf-8") as f:
                     f.write("\n".join(language_output))
 
     # Save all metrics in a single JSON file for structured analysis
